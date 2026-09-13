@@ -23,6 +23,9 @@ ice-chart 的 **agent 友好层**：一张表 + `encoding` → `ChartOption` →
 
 ## 发布
 
+- **分支与发版铁律（2026-09-13 确立）**：开发在临时分支（或 `dev`）上做，`main` 只做集成与发版；
+  **发版前先把开发分支合并进 `main`，再从 `main` 发版**。禁止直接在 `main` 上写实现，
+  也禁止只把改动留在临时分支而让 `main` 停在旧版本（远端默认分支必须指向 `main`）。
 - npm：`npm publish --access public`（`prepublishOnly` 会跑 `npm run verify`）
 - skill：`npx @skills-hub-ai/cli publish skills/ice-chart-dsl/SKILL.md --tags chart,dsl`
   （新版本用 `npx @skills-hub-ai/cli version ice-chart-dsl skills/ice-chart-dsl/SKILL.md`）
