@@ -1,7 +1,7 @@
 ---
 name: ice-chart-dsl
 description: Build interactive ice-chart charts from a JSON-first DSL — a table plus an encoding that binds columns to channels, with structured diagnostics for self-repair.
-version: "0.1.2"
+version: "0.1.3"
 category: ux
 platforms:
   - claude-code
@@ -102,6 +102,6 @@ Example feedback:
 ## Reference
 
 - package: `@damoqiongqiu/ice-chart-dsl` (npm)
-- runtime peer dependencies: `@damoqiongqiu/ice-chart@^0.18.0` +
-  `ice-render@^2.0.0`（家族当前引擎 `2.2.0`，建议直接装最新）
+- runtime peer dependencies: `@damoqiongqiu/ice-chart@^0.19.0` +
+  `ice-render@^2.3.0`（家族当前引擎 `2.3.0`，建议直接装最新）
 - schema: `src/schema/chart-dsl.schema.json`
