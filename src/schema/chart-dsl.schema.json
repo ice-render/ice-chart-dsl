@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ice-chart-dsl document",
+  "description": "JSON-first DSL for building ice-chart charts: a table plus an encoding that binds columns to visual channels.",
+  "type": "object",
+  "required": ["kind"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": {
+      "enum": [
+        "line",
+        "area",
+        "bar",
+        "pie",
+        "scatter",
+        "function",
+        "radar",
+        "candlestick",
+        "heatmap",
+        "sankey",
+        "treemap",
+        "gauge",
+        "boxplot",
+        "waterfall",
+        "funnel",
+        "graph",
+        "parametric",
+        "liquid"
+      ]
+    },
+    "data": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["columns", "rows"],
+          "properties": {
+            "columns": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+            "rows": { "type": "array", "items": { "type": "array" } }
+          }
+        },
+        {
+          "type": "array",
+          "description": "对象数组写法：[{ 月份: '1月', 销量: 120 }]",
+          "items": { "type": "object" }
+        }
+      ]
+    },
+    "encoding": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "x": { "type": "string", "description": "横轴列（数值列自动用数值轴）" },
+        "y": {
+          "oneOf": [
+            { "type": "string" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        },
+        "series": { "type": "string", "description": "分组列：同一 x 上拆成多个系列" },
+        "size": { "type": "string", "description": "第三维：气泡大小" },
+        "color": { "type": "string" },
+        "name": { "type": "string", "description": "名称列（饼图/漏斗等）" },
+        "value": { "type": "string", "description": "数值列（饼图/漏斗/仪表盘等）" }
+      }
+    },
+    "title": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "properties": { "text": { "type": "string" }, "subtext": { "type": "string" } }
+        }
+      ]
+    },
+    "expression": { "type": "string", "description": "kind 为 function / parametric 时的公式" },
+    "domain": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+    "params": { "type": "object", "additionalProperties": { "type": "number" } },
+    "options": { "type": "object", "description": "逃生舱：直接并进 ChartOption（同名键覆盖编译结果）" },
+    "series": { "type": "array", "description": "逃生舱：直接给 option.series（给了它就不再走 data/encoding）" }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>ice-chart-dsl · JSON 驱动图表</title>
+    <style>
+      :root {
+        --bg: #f8f9fa;
+        --panel: #fff;
+        --line: #dee2e6;
+        --text: #212529;
+        --muted: #6c757d;
+        --primary: #0d6efd;
+        --danger: #dc3545;
+        --warning: #b58105;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; padding: 1.25rem 1.5rem 3rem; background: var(--bg); color: var(--text);
+        font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', sans-serif; font-size: 14px;
+      }
+      h1 { margin: 0 0 0.25rem; font-size: 1.35rem; font-weight: 600; }
+      p.lead { margin: 0 0 1rem; color: var(--muted); font-size: 0.875rem; line-height: 1.7; }
+      .layout { display: grid; grid-template-columns: minmax(360px, 44%) 1fr; gap: 1rem; align-items: start; }
+      .card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 0.75rem; }
+      .toolbar { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
+      button {
+        font: inherit; font-size: 12px; padding: 0.25rem 0.6rem; border: 1px solid var(--line);
+        border-radius: 4px; background: #fff; color: var(--text); cursor: pointer;
+      }
+      button:hover { border-color: var(--primary); color: var(--primary); }
+      button.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+      textarea {
+        width: 100%; height: 30rem; resize: vertical; padding: 0.6rem; border: 1px solid var(--line);
+        border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px; line-height: 1.6; color: var(--text); background: #fff;
+      }
+      canvas { display: block; }
+      #diagnostics {
+        margin: 0.6rem 0 0; padding: 0.5rem 0.65rem; max-height: 12rem; overflow: auto;
+        border: 1px solid var(--line); border-radius: 4px; background: #f8f9fa;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.7;
+        white-space: pre-wrap;
+      }
+      .error { color: var(--danger); }
+      .warning { color: var(--warning); }
+      .ok { color: #198754; }
+      .meta { color: var(--muted); font-size: 12px; margin-top: 0.5rem; }
+    </style>
+  </head>
+  <body>
+    <h1>ice-chart-dsl · JSON 驱动图表</h1>
+    <p class="lead">
+      左边写 DSL（一张表 + <code>encoding</code> 把列绑到通道上），右边立刻编译成 <code>ChartOption</code> 渲染出来。
+      编译产物就是 ice-chart 的普通配置 —— 悬停 / 缩放 / 框选 / 序列化全部照旧。下面的诊断面板是给 agent 看的：
+      列写错了、公式画不出来，都会带着位置报回来。
+    </p>
+    <div class="layout">
+      <div class="card">
+        <div class="toolbar">
+          <button class="primary" id="btn-render">渲染</button>
+          <button data-preset="line">折线（分组）</button>
+          <button data-preset="bar">柱形（堆叠）</button>
+          <button data-preset="pie">饼图</button>
+          <button data-preset="scatter">气泡</button>
+          <button data-preset="function">表达式</button>
+          <button data-preset="bad-column">错误示例</button>
+        </div>
+        <textarea id="dsl" spellcheck="false"></textarea>
+        <pre id="diagnostics">…</pre>
+      </div>
+      <div class="card">
+        <canvas id="chart" width="760" height="520"></canvas>
+        <div class="meta" id="meta">—</div>
+      </div>
+    </div>
+
+    <script src="../node_modules/ice-render/dist/index.umd.js"></script>
+    <script src="../node_modules/@damoqiongqiu/ice-chart/dist/index.umd.js"></script>
+    <script src="../dist/index.umd.js"></script>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const PRESETS = {
+        line: {
+          schemaVersion: 1,
+          kind: 'line',
+          title: '月度销量（线上 / 线下）',
+          data: {
+            columns: ['月份', '销量', '渠道'],
+            rows: [
+              ['1月', 120, '线上'], ['1月', 86, '线下'],
+              ['2月', 142, '线上'], ['2月', 92, '线下'],
+              ['3月', 168, '线上'], ['3月', 78, '线下'],
+              ['4月', 154, '线上'], ['4月', 110, '线下'],
+              ['5月', 186, '线上'], ['5月', 124, '线下'],
+            ],
+          },
+          encoding: { x: '月份', y: '销量', series: '渠道' },
+          options: { crosshair: { show: true, axis: 'x', showAxisLabel: true } },
+        },
+        bar: {
+          schemaVersion: 1,
+          kind: 'bar',
+          title: '各区域收入（堆叠）',
+          data: {
+            columns: ['区域', '收入', '业务线'],
+            rows: [
+              ['华东', 320, 'SaaS'], ['华东', 180, '硬件'],
+              ['华南', 260, 'SaaS'], ['华南', 140, '硬件'],
+              ['华北', 210, 'SaaS'], ['华北', 160, '硬件'],
+            ],
+          },
+          encoding: { x: '区域', y: '收入', series: '业务线' },
+          options: { stack: true },
+        },
+        pie: {
+          schemaVersion: 1,
+          kind: 'pie',
+          title: '流量来源',
+          data: {
+            columns: ['来源', '会话数'],
+            rows: [['自然搜索', 4200], ['信息流', 3100], ['社交媒体', 1800], ['直接访问', 900]],
+          },
+          encoding: { name: '来源', value: '会话数' },
+        },
+        scatter: {
+          schemaVersion: 1,
+          kind: 'scatter',
+          title: '客单价 vs 复购率（气泡=订单量）',
+          data: {
+            columns: ['客单价', '复购率', '订单量'],
+            rows: [[120, 0.32, 800], [180, 0.41, 1200], [260, 0.28, 400], [90, 0.55, 1600], [320, 0.22, 260]],
+          },
+          encoding: { x: '客单价', y: '复购率', size: '订单量' },
+        },
+        function: {
+          schemaVersion: 1,
+          kind: 'function',
+          title: '阻尼振荡',
+          expression: 'a*exp(-b*x)*sin(c*x)',
+          domain: [-1, 12],
+          params: { a: 1.8, b: 0.18, c: 3 },
+          options: { yAxis: { min: -2.2, max: 2.2 } },
+        },
+        'bad-column': {
+          schemaVersion: 1,
+          kind: 'line',
+          data: { columns: ['月份', '销量'], rows: [['1月', 120], ['2月', 132]] },
+          encoding: { x: '月份', y: '销售额' },
+        },
+      };
+
+      let chart = null;
+      function render() {
+        let dsl;
+        try {
+          dsl = JSON.parse($('dsl').value);
+        } catch (err) {
+          $('diagnostics').innerHTML = '<span class="error">[错误] JSON 解析失败：' + err.message + '</span>';
+          $('meta').textContent = '—';
+          return;
+        }
+        const result = ICEChartDSL.validateChartDsl(dsl);
+        const lines = [...result.errors, ...result.warnings].map((item) => {
+          const cls = item.severity === 'error' ? 'error' : 'warning';
+          const tag = item.severity === 'error' ? '[错误]' : '[警告]';
+          return '<span class="' + cls + '">' + tag + '</span> ' + item.message + (item.path ? '（' + item.path + '）' : '');
+        });
+        $('diagnostics').innerHTML = lines.length ? lines.join('\n') : '<span class="ok">✓ 校验通过</span>';
+        if (!result.valid) {
+          $('meta').textContent = '校验不通过：' + result.errors.length + ' 个错误';
+          return;
+        }
+        try {
+          const option = ICEChartDSL.compileChartDsl(dsl);
+          if (chart) chart.destroy();
+          chart = ICEChart.createChart('chart', option);
+          const json = chart.toJSONString();
+          $('meta').textContent =
+            '编译产物：' + option.series.length + ' 个系列 · ' + Math.round(json.length / 1024 * 10) / 10 + ' KB JSON（chart.toJSONString()）';
+        } catch (err) {
+          $('diagnostics').innerHTML = '<span class="error">[错误] ' + err.message + '</span>';
+        }
+      }
+
+      function loadPreset(name) {
+        $('dsl').value = JSON.stringify(PRESETS[name], null, 2);
+        render();
+      }
+      document.querySelectorAll('[data-preset]').forEach((button) => {
+        button.addEventListener('click', () => loadPreset(button.dataset.preset));
+      });
+      $('btn-render').addEventListener('click', render);
+      loadPreset('line');
+    </script>
+  </body>
+</html>

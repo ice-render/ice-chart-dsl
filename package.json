@@ -1,0 +1,68 @@
+{
+  "name": "@damoqiongqiu/ice-chart-dsl",
+  "version": "0.0.1",
+  "license": "MIT",
+  "author": "大漠穷秋",
+  "description": "A JSON-first DSL layer for AI agents to build charts with ice-chart.",
+  "keywords": [
+    "dsl",
+    "chart",
+    "json",
+    "ai-agent",
+    "ice-chart",
+    "visualization"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ice-render/ice-chart-dsl.git"
+  },
+  "homepage": "https://github.com/ice-render/ice-chart-dsl#readme",
+  "bugs": {
+    "url": "https://github.com/ice-render/ice-chart-dsl/issues"
+  },
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "types": "dist/types/index.d.ts",
+  "browser": "dist/index.umd.js",
+  "unpkg": "dist/index.umd.js",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "npm run clean && npm run build:types && npm run build:js",
+    "build:js": "rollup -c --environment NODE_ENV:production",
+    "build:types": "tsc --emitDeclarationOnly",
+    "clean": "rimraf dist",
+    "dev": "rollup -c -w --environment NODE_ENV:development",
+    "test": "jest --runInBand",
+    "types:check": "tsc --noEmit",
+    "verify": "npm run types:check && npm run build && npm test -- --runInBand",
+    "prepublishOnly": "npm run verify"
+  },
+  "peerDependencies": {
+    "@damoqiongqiu/ice-chart": "^0.17.2",
+    "ice-render": "^1.4.7"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.5",
+    "@babel/preset-env": "^7.28.5",
+    "@babel/preset-typescript": "^7.28.5",
+    "@damoqiongqiu/ice-chart": "^0.17.2",
+    "@rollup/plugin-babel": "^6.0.4",
+    "@rollup/plugin-commonjs": "^28.0.1",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^15.3.0",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@types/jest": "^29.5.14",
+    "babel-jest": "^29.7.0",
+    "ice-render": "^1.4.7",
+    "jest": "^29.7.0",
+    "rimraf": "^6.0.1",
+    "rollup": "^3.29.5",
+    "typescript": "^5.9.3"
+  }
+}
