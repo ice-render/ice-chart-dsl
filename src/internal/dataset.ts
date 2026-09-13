@@ -76,3 +76,24 @@ export function toArray(value: string | string[] | undefined): string[] {
   if (value === undefined || value === null) return [];
   return Array.isArray(value) ? value.filter((v) => typeof v === 'string' && v) : [value];
 }
+
+/** 把一个数值向上取整到「好看的刻度」（1 / 2 / 5 × 10^k），给雷达图的指标上限用。 */
+export function niceCeil(value: number): number {
+  if (!isFinite(value) || value <= 0) return 1;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
+  const normalized = value / magnitude;
+  const step = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return step * magnitude;
+}
+
+/** 去重并保持首次出现的顺序。 */
+export function unique<T>(values: T[]): T[] {
+  const out: T[] = [];
+  for (const value of values) if (!out.some((item) => item === value)) out.push(value);
+  return out;
+}
+
+/** `y` 这种「单列或一组列」的通道，取它当单列用时的那一列。 */
+export function firstColumn(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}

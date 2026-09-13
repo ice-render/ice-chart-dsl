@@ -64,6 +64,11 @@
           <button data-preset="pie">饼图</button>
           <button data-preset="scatter">气泡</button>
           <button data-preset="function">表达式</button>
+          <button data-preset="radar">雷达</button>
+          <button data-preset="heatmap">热力图</button>
+          <button data-preset="candlestick">K 线</button>
+          <button data-preset="waterfall">瀑布</button>
+          <button data-preset="sankey">桑基</button>
           <button data-preset="bad-column">错误示例</button>
         </div>
         <textarea id="dsl" spellcheck="false"></textarea>
@@ -141,6 +146,83 @@
           domain: [-1, 12],
           params: { a: 1.8, b: 0.18, c: 3 },
           options: { yAxis: { min: -2.2, max: 2.2 } },
+        },
+        radar: {
+          schemaVersion: 1,
+          kind: 'radar',
+          title: '机房健康度',
+          data: {
+            columns: ['指标', '得分', '机房'],
+            rows: [
+              ['算力', 92, 'A 机房'], ['存储', 74, 'A 机房'], ['网络', 86, 'A 机房'], ['告警', 68, 'A 机房'],
+              ['算力', 78, 'B 机房'], ['存储', 88, 'B 机房'], ['网络', 71, 'B 机房'], ['告警', 82, 'B 机房'],
+            ],
+          },
+          encoding: { x: '指标', y: '得分', series: '机房' },
+        },
+        heatmap: {
+          schemaVersion: 1,
+          kind: 'heatmap',
+          title: '时段 × 区域 负载',
+          data: {
+            columns: ['时段', '区域', '负载'],
+            rows: [
+              ['T1', '华东', 42], ['T1', '华北', 55], ['T1', '华南', 38],
+              ['T2', '华东', 68], ['T2', '华北', 74], ['T2', '华南', 46],
+              ['T3', '华东', 91], ['T3', '华北', 66], ['T3', '华南', 58],
+              ['T4', '华东', 74], ['T4', '华北', 52], ['T4', '华南', 63],
+            ],
+          },
+          encoding: { x: '时段', y: '区域', value: '负载' },
+        },
+        candlestick: {
+          schemaVersion: 1,
+          kind: 'candlestick',
+          title: '近 6 日行情',
+          data: {
+            columns: ['日期', '开', '收', '低', '高'],
+            rows: [
+              ['1日', 32.1, 33.4, 31.8, 33.9],
+              ['2日', 33.4, 32.6, 32.2, 34.1],
+              ['3日', 32.6, 34.8, 32.5, 35.2],
+              ['4日', 34.8, 36.2, 34.4, 36.7],
+              ['5日', 36.2, 35.1, 34.7, 36.4],
+              ['6日', 35.1, 37.4, 35.0, 37.8],
+            ],
+          },
+          encoding: { x: '日期', y: ['开', '收', '低', '高'] },
+        },
+        waterfall: {
+          schemaVersion: 1,
+          kind: 'waterfall',
+          title: '单票利润构成',
+          data: {
+            columns: ['项目', '金额', '合计'],
+            rows: [
+              ['营业收入', 4200, 0],
+              ['营业成本', -1860, 0],
+              ['销售费用', -720, 0],
+              ['管理费用', -430, 0],
+              ['其它收益', 260, 0],
+              ['净利润', 0, 1],
+            ],
+          },
+          encoding: { name: '项目', value: '金额', total: '合计' },
+        },
+        sankey: {
+          schemaVersion: 1,
+          kind: 'sankey',
+          title: '渠道 → 页面 → 结果',
+          data: {
+            columns: ['来源', '去向', '流量'],
+            rows: [
+              ['自然搜索', '首页', 420], ['信息流', '首页', 300], ['社交媒体', '首页', 220],
+              ['首页', '列表页', 520], ['首页', '流失', 420],
+              ['列表页', '详情页', 430], ['列表页', '流失', 90],
+              ['详情页', '下单', 300], ['详情页', '流失', 130],
+            ],
+          },
+          encoding: { source: '来源', target: '去向', value: '流量' },
         },
         'bad-column': {
           schemaVersion: 1,

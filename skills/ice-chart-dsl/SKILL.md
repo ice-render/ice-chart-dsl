@@ -1,7 +1,7 @@
 ---
 name: ice-chart-dsl
 description: Build interactive ice-chart charts from a JSON-first DSL — a table plus an encoding that binds columns to channels, with structured diagnostics for self-repair.
-version: "0.0.1"
+version: "0.1.0"
 category: ux
 platforms:
   - claude-code
@@ -25,6 +25,10 @@ configuration code.
 This SKILL is the right choice for:
 
 - business charts: line / area / bar / pie / scatter bubble
+- tables with a second category dimension: radar (indicators), heatmap (row × column matrix)
+- financial tables: candlestick (open/close/low/high), waterfall (with a total row)
+- flow tables: sankey (source / target / value)
+- single-value cards: funnel / gauge / liquid
 - math curves: `kind: "function"` (e.g. `sin(x)/x`, damped oscillation)
 - charts that must be interactive afterwards (hover, zoom, brush, legend toggle, serialization)
 - datasets where columns must be bound to channels instead of hand-built `series[].data`
@@ -61,7 +65,12 @@ npm install @damoqiongqiu/ice-chart-dsl @damoqiongqiu/ice-chart ice-render
 - `encoding.y` accepts one column name or an array (each column becomes a series).
 - `encoding.series` splits one `y` column into multiple series.
 - `encoding.size` makes a bubble chart (`kind: "scatter"`).
-- `encoding.name` + `encoding.value` are for `pie`.
+- `encoding.name` + `encoding.value` are for `pie` / `funnel` / `gauge` / `liquid`;
+  `waterfall` uses them plus an optional `encoding.total` column (non-zero marks the total row).
+- `encoding.x` + `encoding.y` + `encoding.series` make a `radar` (x holds the indicator names).
+- `encoding.x` + `encoding.y` (two category columns) + `encoding.value` make a `heatmap`.
+- `encoding.x` + `encoding.y` **as four columns `[open, close, low, high]`** make a `candlestick`.
+- `encoding.source` + `encoding.target` + `encoding.value` make a `sankey`.
 - `kind: "function"` needs `expression` (+ optional `domain`, `params`) and no data.
 
 ## API

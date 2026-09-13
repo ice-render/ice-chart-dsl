@@ -115,6 +115,56 @@ describe('编译产物必须能被核心消费', () => {
     ['数值 x 的 scatter', { kind: 'scatter', data: { columns: ['x', 'y'], rows: [[1, 2], [3, 4]] }, encoding: { x: 'x', y: 'y' } }],
     ['pie', { kind: 'pie', data: { columns: ['n', 'v'], rows: [['A', 1], ['B', 2]] }, encoding: { name: 'n', value: 'v' } }],
     ['function', { kind: 'function', expression: 'sin(x)/x', domain: [-5, 5] }],
+    [
+      'radar',
+      {
+        kind: 'radar',
+        data: {
+          columns: ['指标', '得分', '机房'],
+          rows: [['算力', 90, 'A'], ['存储', 70, 'A'], ['网络', 80, 'A'], ['算力', 60, 'B'], ['存储', 85, 'B'], ['网络', 65, 'B']],
+        },
+        encoding: { x: '指标', y: '得分', series: '机房' },
+      },
+    ],
+    [
+      'heatmap',
+      {
+        kind: 'heatmap',
+        data: { columns: ['时段', '区域', '负载'], rows: [['T1', '华东', 40], ['T1', '华北', 55], ['T2', '华东', 62]] },
+        encoding: { x: '时段', y: '区域', value: '负载' },
+      },
+    ],
+    [
+      'candlestick',
+      {
+        kind: 'candlestick',
+        data: {
+          columns: ['日期', '开', '收', '低', '高'],
+          rows: [['1月', 10, 12, 9, 13], ['2月', 12, 11, 10, 14]],
+        },
+        encoding: { x: '日期', y: ['开', '收', '低', '高'] },
+      },
+    ],
+    [
+      'waterfall',
+      {
+        kind: 'waterfall',
+        data: {
+          columns: ['项目', '金额', '合计'],
+          rows: [['收入', 4200, 0], ['成本', -1860, 0], ['净利润', 0, 1]],
+        },
+        encoding: { name: '项目', value: '金额', total: '合计' },
+      },
+    ],
+    [
+      'sankey',
+      {
+        kind: 'sankey',
+        data: { columns: ['来源', '去向', '流量'], rows: [['搜索', '首页', 420], ['信息流', '首页', 300], ['首页', '下单', 260]] },
+        encoding: { source: '来源', target: '去向', value: '流量' },
+      },
+    ],
+    ['gauge', { kind: 'gauge', data: { columns: ['名称', '值'], rows: [['负载', 73]] }, encoding: { name: '名称', value: '值' } }],
   ];
 
   it.each(cases)('%s：normalizeOption 能吃下且系列数正确', (_name, dsl) => {
@@ -125,3 +175,79 @@ describe('编译产物必须能被核心消费', () => {
     for (const series of norm.series) expect(series.points.length).toBeGreaterThan(0);
   });
 });
+
+describe('新增类型的编译细节', () => {
+  it('radar：指标从 x 列推，上限取整到好看的刻度；series 拆多边形', () => {
+    const option: any = compileChartDsl({
+      kind: 'radar',
+      data: {
+        columns: ['指标', '得分', '机房'],
+        rows: [['算力', 90, 'A'], ['存储', 70, 'A'], ['网络', 80, 'A'], ['算力', 62, 'B'], ['存储', 85, 'B'], ['网络', 66, 'B']],
+      },
+      encoding: { x: '指标', y: '得分', series: '机房' },
+    });
+    expect(option.radar.indicators.map((i: any) => i.name)).toEqual(['算力', '存储', '网络']);
+    expect(option.radar.indicators[0].max).toBe(100); // 90 → 100
+    expect(option.series.map((s: any) => s.name)).toEqual(['A', 'B']);
+    expect(option.series[0].data).toEqual([90, 70, 80]);
+  });
+
+  it('heatmap：x / y 两个类目列 + value 数值列', () => {
+    const option: any = compileChartDsl({
+      kind: 'heatmap',
+      data: { columns: ['时段', '区域', '负载'], rows: [['T1', '华东', 40], ['T1', '华北', 55], ['T2', '华东', 62]] },
+      encoding: { x: '时段', y: '区域', value: '负载' },
+    });
+    expect(option.xAxis.data).toEqual(['T1', 'T2']);
+    expect(option.yAxis.type).toBe('category');
+    expect(option.series[0].data).toEqual([['T1', '华东', 40], ['T1', '华北', 55], ['T2', '华东', 62]]);
+  });
+
+  it('candlestick：四列按 [开, 收, 低, 高] 打包', () => {
+    const option: any = compileChartDsl({
+      kind: 'candlestick',
+      data: { columns: ['日期', '开', '收', '低', '高'], rows: [['1月', 10, 12, 9, 13]] },
+      encoding: { x: '日期', y: ['开', '收', '低', '高'] },
+    });
+    expect(option.series[0].data).toEqual([[10, 12, 9, 13]]);
+    expect(option.xAxis.type).toBe('category');
+  });
+
+  it('waterfall：total 列标记合计项', () => {
+    const option: any = compileChartDsl({
+      kind: 'waterfall',
+      data: { columns: ['项目', '金额', '合计'], rows: [['收入', 4200, 0], ['成本', -1860, 0], ['净利润', 0, 1]] },
+      encoding: { name: '项目', value: '金额', total: '合计' },
+    });
+    expect(option.series[0].data[2]).toEqual({ name: '净利润', value: 0, total: true });
+    expect(option.series[0].data[0].total).toBeUndefined();
+  });
+
+  it('sankey：连线表 → nodes + links（非正数流量跳过）', () => {
+    const option: any = compileChartDsl({
+      kind: 'sankey',
+      data: { columns: ['来源', '去向', '流量'], rows: [['搜索', '首页', 420], ['首页', '下单', 260], ['首页', '流失', 0]] },
+      encoding: { source: '来源', target: '去向', value: '流量' },
+    });
+    expect(option.sankey.nodes.map((n: any) => n.name)).toEqual(['搜索', '首页', '下单']);
+    expect(option.sankey.links).toHaveLength(2);
+  });
+
+  it('K 线少给列会明确报错（顺序是有约定的）', () => {
+    const result = compileChartDslSafe({
+      kind: 'candlestick',
+      data: { columns: ['日期', '开', '收'], rows: [['1月', 10, 12]] },
+      encoding: { x: '日期', y: ['开', '收'] },
+    });
+    expect(result.error).toBeTruthy();
+    expect((result.error as any).diagnostics.map((d: any) => d.code)).toContain('ohlc-needs-four-columns');
+  });
+});
+
+function compileChartDslSafe(dsl: any): { option?: any; error?: any } {
+  try {
+    return { option: compileChartDsl(dsl) };
+  } catch (error) {
+    return { error };
+  }
+}

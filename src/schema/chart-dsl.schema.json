@@ -60,7 +60,10 @@
         "size": { "type": "string", "description": "第三维：气泡大小" },
         "color": { "type": "string" },
         "name": { "type": "string", "description": "名称列（饼图/漏斗等）" },
-        "value": { "type": "string", "description": "数值列（饼图/漏斗/仪表盘等）" }
+        "value": { "type": "string", "description": "数值列（饼图/漏斗/仪表盘/热力图/桑基等）" },
+        "total": { "type": "string", "description": "瀑布图：非 0 的行当合计项" },
+        "source": { "type": "string", "description": "桑基图：连线起点列" },
+        "target": { "type": "string", "description": "桑基图：连线终点列" }
       }
     },
     "title": {

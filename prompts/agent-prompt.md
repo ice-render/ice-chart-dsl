@@ -7,7 +7,9 @@
 
 1. 先看数据：列名、每列是数字还是文本。
 2. 选 `kind`：比较用 `bar`，趋势用 `line` / `area`，构成用 `pie`，两个数值列的关系用 `scatter`，
-   数学公式用 `function`。
+   多维评分用 `radar`，二维矩阵用 `heatmap`，行情用 `candlestick`（`y` 是四列 `[开, 收, 低, 高]`），
+   增减构成用 `waterfall`（可加 `total` 列标合计），流向用 `sankey`（`source` / `target` / `value`），
+   单值卡片用 `gauge` / `liquid`，数学公式用 `function`。
 3. 写 `data`（`columns` + `rows`，或对象数组）与 `encoding`：
    - `x` 放类目 / 时间 / 数值列；
    - `y` 放要比较的数值列（多个列名 = 多个系列）；

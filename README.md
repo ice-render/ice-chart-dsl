@@ -73,11 +73,22 @@ if (!result.valid) console.log(result.errors.map((e) => e.message).join('\n'));
 
 ## kind 与覆盖范围
 
-- **带 `data`/`encoding` 编译**：`line` / `area` / `bar` / `pie` / `scatter` / `function`
-  （`bar` 用 `options.stack` 出堆叠；`scatter` 绑 `encoding.size` 出气泡；数值 x 自动用数值轴 + `[x, y]` 数据点）
-- **直通**：其余类型（`radar` / `heatmap` / `sankey` / `treemap` / `gauge` / `boxplot` / `waterfall` /
-  `funnel` / `graph` / `candlestick` / `parametric` / `liquid`）直接给 `series`，`options` 照常透传
-- **逃生舱**：`options` 里的键覆盖编译结果（`series` 除外），所以 DSL 跟不上核心演进时不会把人堵死
+| kind | 需要的通道 | 说明 |
+| --- | --- | --- |
+| `line` / `area` | `x` + `y`（+ `series`） | 数值 x 自动用数值轴 + `[x, y]` 数据点 |
+| `bar` | `x` + `y`（+ `series`） | 堆叠用 `options.stack` |
+| `scatter` | `x` + `y`（+ `size`） | 绑 `size` 即气泡图 |
+| `pie` | `name` + `value` | 负值会被警告（饼图不表达负值） |
+| `radar` | `x`（指标）+ `y`（数值）+ `series` | 指标名从 x 列推，上限自动取整到好看的刻度 |
+| `heatmap` | `x` + `y`（两个类目列）+ `value` | 二维矩阵表直接画 |
+| `candlestick` | `x` + `y`＝**四列** `[开, 收, 低, 高]` | 少给列会明确报错 |
+| `waterfall` | `name` + `value`（+ `total`） | `total` 列非 0 的行当合计项 |
+| `funnel` / `gauge` / `liquid` | `name` + `value` | 仪表盘/水位球只取第一行（多行会警告） |
+| `sankey` | `source` + `target` + `value` | 一张「起点 / 终点 / 流量」的连线表 |
+| `function` | `expression`（+ `domain` / `params`） | 不需要 data |
+
+**直通**：`treemap` / `graph` / `parametric` / `boxplot` 等直接给 `series`（`options` 照常透传）。
+**逃生舱**：`options` 里的键覆盖编译结果（`series` 除外），所以 DSL 跟不上核心演进时不会把人堵死。
 
 ## 诊断：给 agent 的自修复反馈
 
@@ -100,6 +111,7 @@ if (!result.valid) console.log(result.errors.map((e) => e.message).join('\n'));
 | 导出 | 说明 |
 | --- | --- |
 | `CHART_DSL_SCHEMA_VERSION` / `CHART_DSL_KINDS` | 版本与支持的 kind |
+| `CHART_DSL_COMPILED_KINDS` | 走 data/encoding 编译的 kind 清单 |
 | `validateChartDsl(dsl)` | 结构 + 语义校验，返回 `{ valid, errors, warnings }` |
 | `formatDiagnostics(result)` | 诊断 → 多行文本 |
 | `compileChartDsl(dsl)` | DSL → `ChartOption`（不合法时抛 `ChartDslCompileError`，`.diagnostics` 带原因） |

@@ -9,6 +9,7 @@ import {
   toNumber,
   type ResolvedDataset,
 } from '../internal/dataset';
+import { firstColumn, niceCeil } from '../internal/dataset';
 import { validateChartDsl } from '../validate';
 
 /** 编译失败时抛出：`diagnostics` 就是校验结果，调用方可以直接拿去做自修复提示。 */
@@ -59,11 +60,9 @@ export function compileChartDsl(dsl: ChartDslDocument): ChartOption {
     ];
   } else {
     const dataset = resolveDataset(dsl) as ResolvedDataset;
-    if (kind === 'pie') {
-      Object.assign(option, compilePie(dsl, dataset));
-    } else {
-      Object.assign(option, compileCartesian(dsl, dataset, kind));
-    }
+    // 每种类型的数据形状差别很大（category-hue / 三维 / OHLC / 分层…），
+    // 所以按 kind 分派到专门的编译器，而不是硬塞进一个通用路径。
+    Object.assign(option, compileByKind(dsl, dataset, kind));
   }
 
   if (dsl.options && typeof dsl.options === 'object') {
@@ -75,6 +74,28 @@ export function compileChartDsl(dsl: ChartDslDocument): ChartOption {
     }
   }
   return option as ChartOption;
+}
+
+function compileByKind(dsl: ChartDslDocument, dataset: ResolvedDataset, kind: ChartDslKind): Record<string, any> {
+  switch (kind) {
+    case 'pie':
+    case 'funnel':
+    case 'gauge':
+    case 'liquid':
+      return compileNameValue(dsl, dataset, kind);
+    case 'radar':
+      return compileRadar(dsl, dataset);
+    case 'heatmap':
+      return compileHeatmap(dsl, dataset);
+    case 'candlestick':
+      return compileCandlestick(dsl, dataset);
+    case 'waterfall':
+      return compileWaterfall(dsl, dataset);
+    case 'sankey':
+      return compileSankey(dsl, dataset);
+    default:
+      return compileCartesian(dsl, dataset, kind);
+  }
 }
 
 function normalizeTitle(dsl: ChartDslDocument): any {
@@ -152,18 +173,162 @@ function compileCartesian(dsl: ChartDslDocument, dataset: ResolvedDataset, kind:
   return option;
 }
 
-/** 饼图 / 玫瑰图：name + value 两列。 */
-function compilePie(dsl: ChartDslDocument, dataset: ResolvedDataset): Record<string, any> {
+/** 饼图 / 玫瑰图 / 漏斗 / 仪表盘 / 水位球：都是 name + value 两列。 */
+function compileNameValue(dsl: ChartDslDocument, dataset: ResolvedDataset, kind: ChartDslKind): Record<string, any> {
   const encoding = dsl.encoding || {};
   const nameIndex = columnIndex(dataset, encoding.name);
   const valueIndex = columnIndex(dataset, encoding.value);
   const data = dataset.rows
     .map((row) => ({ name: toLabel(row[nameIndex]), value: toNumber(row[valueIndex]) as number }))
     .filter((item) => item.name !== '' && isFinite(item.value));
+  const isSingleValue = kind === 'gauge' || kind === 'liquid';
   return {
-    legend: { show: true },
+    legend: { show: kind === 'pie' || kind === 'funnel' },
     tooltip: { trigger: 'item' },
-    series: [{ id: 'pie', type: 'pie', name: encoding.value, data }],
+    series: [{ id: kind, type: kind, name: encoding.value, data: isSingleValue ? data.slice(0, 1) : data }],
+  };
+}
+
+/** 雷达图：x 列是指标，y 列是数值，series 列把数据拆成多个多边形。 */
+function compileRadar(dsl: ChartDslDocument, dataset: ResolvedDataset): Record<string, any> {
+  const encoding = dsl.encoding || {};
+  const indicatorIndex = columnIndex(dataset, encoding.x);
+  const valueIndex = columnIndex(dataset, firstColumn(encoding.y));
+  const groupIndex = columnIndex(dataset, encoding.series);
+
+  const indicators: string[] = [];
+  const byGroup = new Map<string, Map<string, number>>();
+  for (const row of dataset.rows) {
+    const indicator = toLabel(row[indicatorIndex]);
+    const value = toNumber(row[valueIndex]);
+    if (!indicator || value === null) continue;
+    if (!indicators.includes(indicator)) indicators.push(indicator);
+    const groupName = groupIndex >= 0 ? toLabel(row[groupIndex]) || '（空）' : String(firstColumn(encoding.y));
+    if (!byGroup.has(groupName)) byGroup.set(groupName, new Map());
+    byGroup.get(groupName)!.set(indicator, value);
+  }
+  const maxByIndicator = indicators.map((name) => {
+    let max = 0;
+    for (const values of byGroup.values()) max = Math.max(max, Math.abs(values.get(name) ?? 0));
+    return niceCeil(max);
+  });
+  return {
+    legend: { show: byGroup.size > 1 },
+    tooltip: { trigger: 'item' },
+    radar: {
+      indicators: indicators.map((name, index) => ({ name, max: maxByIndicator[index] })),
+      splitNumber: 4,
+    },
+    series: [...byGroup.entries()].map(([name, values], index) => ({
+      id: `radar-${index + 1}`,
+      type: 'radar',
+      name,
+      data: indicators.map((indicator) => values.get(indicator) ?? 0),
+    })),
+  };
+}
+
+/** 热力图：x / y 两个类目列 + value 数值列。 */
+function compileHeatmap(dsl: ChartDslDocument, dataset: ResolvedDataset): Record<string, any> {
+  const encoding = dsl.encoding || {};
+  const xIndex = columnIndex(dataset, encoding.x);
+  const yIndex = columnIndex(dataset, firstColumn(encoding.y));
+  const valueIndex = columnIndex(dataset, encoding.value || encoding.color);
+  const xs: string[] = [];
+  const ys: string[] = [];
+  const data: Array<[string, string, number]> = [];
+  for (const row of dataset.rows) {
+    const x = toLabel(row[xIndex]);
+    const y = toLabel(row[yIndex]);
+    const value = toNumber(row[valueIndex]);
+    if (!x || !y || value === null) continue;
+    if (!xs.includes(x)) xs.push(x);
+    if (!ys.includes(y)) ys.push(y);
+    data.push([x, y, value]);
+  }
+  return {
+    legend: { show: false },
+    tooltip: { trigger: 'item' },
+    xAxis: { type: 'category', name: encoding.x, data: xs },
+    yAxis: { type: 'category', name: encoding.y },
+    grid: { x: false, y: false },
+    series: [{ id: 'heatmap', type: 'heatmap', name: encoding.value, data }],
+  };
+}
+
+/** K 线：x 是类目/时间列，y 必须是四列 [开, 收, 低, 高]。 */
+function compileCandlestick(dsl: ChartDslDocument, dataset: ResolvedDataset): Record<string, any> {
+  const encoding = dsl.encoding || {};
+  const xIndex = columnIndex(dataset, encoding.x);
+  const [open, close, low, high] = toArray(encoding.y).map((name) => columnIndex(dataset, name));
+  const categories: string[] = [];
+  const data: number[][] = [];
+  for (const row of dataset.rows) {
+    const category = toLabel(row[xIndex]);
+    const o = toNumber(row[open]);
+    const c = toNumber(row[close]);
+    const l = toNumber(row[low]);
+    const h = toNumber(row[high]);
+    if (!category || o === null || c === null || l === null || h === null) continue;
+    if (!categories.includes(category)) categories.push(category);
+    data.push([o, c, l, h]);
+  }
+  return {
+    legend: { show: false },
+    tooltip: { trigger: 'item' },
+    crosshair: { show: true, axis: 'x', showAxisLabel: true },
+    xAxis: { type: 'category', name: encoding.x, data: categories },
+    yAxis: { name: 'OHLC' },
+    series: [{ id: 'candlestick', type: 'candlestick', name: encoding.x, data }],
+  };
+}
+
+/** 瀑布图：name + value（正负），可选的 total 列标记合计项。 */
+function compileWaterfall(dsl: ChartDslDocument, dataset: ResolvedDataset): Record<string, any> {
+  const encoding = dsl.encoding || {};
+  const nameIndex = columnIndex(dataset, encoding.name);
+  const valueIndex = columnIndex(dataset, encoding.value);
+  const totalIndex = columnIndex(dataset, encoding.total);
+  const data = dataset.rows
+    .map((row) => {
+      const name = toLabel(row[nameIndex]);
+      const value = toNumber(row[valueIndex]);
+      const totalRaw = totalIndex >= 0 ? row[totalIndex] : undefined;
+      const total = totalRaw !== undefined && totalRaw !== null && totalRaw !== '' && totalRaw !== false && Number(totalRaw) !== 0;
+      return total ? { name, value: isFinite(value as number) ? value : 0, total: true } : { name, value };
+    })
+    .filter((item) => item.name !== '' && (item.value === null || isFinite(item.value as number)));
+  return {
+    legend: { show: false },
+    tooltip: { trigger: 'item' },
+    xAxis: { type: 'category', name: encoding.name },
+    yAxis: { name: encoding.value },
+    series: [{ id: 'waterfall', type: 'waterfall', name: encoding.value, barWidth: 0.55, data }],
+  };
+}
+
+/** 桑基图：一张「起点 / 终点 / 流量」的连线表。 */
+function compileSankey(dsl: ChartDslDocument, dataset: ResolvedDataset): Record<string, any> {
+  const encoding = dsl.encoding || {};
+  const sourceIndex = columnIndex(dataset, encoding.source);
+  const targetIndex = columnIndex(dataset, encoding.target);
+  const valueIndex = columnIndex(dataset, encoding.value);
+  const nodes: Array<{ name: string }> = [];
+  const links: Array<{ source: string; target: string; value: number }> = [];
+  for (const row of dataset.rows) {
+    const source = toLabel(row[sourceIndex]);
+    const target = toLabel(row[targetIndex]);
+    const value = toNumber(row[valueIndex]);
+    if (!source || !target || value === null || value <= 0) continue;
+    if (!nodes.some((node) => node.name === source)) nodes.push({ name: source });
+    if (!nodes.some((node) => node.name === target)) nodes.push({ name: target });
+    links.push({ source, target, value });
+  }
+  return {
+    legend: { show: false },
+    tooltip: { trigger: 'item' },
+    sankey: { nodes, links, nodeWidth: 12, nodePadding: 8, linkOpacity: 0.5 },
+    series: [{ id: 'sankey', type: 'sankey', name: '流向' }],
   };
 }
 

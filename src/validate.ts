@@ -22,7 +22,7 @@ const ROOT_FIELDS = [
   'series',
 ];
 
-const ENCODING_FIELDS = ['x', 'y', 'series', 'size', 'color', 'name', 'value'];
+const ENCODING_FIELDS = ['x', 'y', 'series', 'size', 'color', 'name', 'value', 'total', 'source', 'target'];
 
 /**
  * 结构 + 语义校验。**任何输入都不抛异常**（包括 null / 数组 / 乱七八糟的对象），
@@ -146,10 +146,11 @@ export function validateChartDsl(dsl: ChartDslDocument | any): ChartDslValidatio
     return index;
   };
 
-  if (kind === 'pie') {
-    needColumn(encoding.name, 'encoding.name', true);
+  // name + value 家族：饼图 / 漏斗 / 仪表盘 / 水位球
+  if (kind === 'pie' || kind === 'funnel' || kind === 'gauge' || kind === 'liquid') {
+    needColumn(encoding.name, 'encoding.name', kind === 'pie' || kind === 'funnel');
     const valueIndex = needNumeric(encoding.value, 'encoding.value', true);
-    if (valueIndex >= 0) {
+    if (valueIndex >= 0 && kind === 'pie') {
       const negative = dataset.rows.filter((row) => {
         const n = Number(row[valueIndex]);
         return isFinite(n) && n < 0;
@@ -157,6 +158,73 @@ export function validateChartDsl(dsl: ChartDslDocument | any): ChartDslValidatio
       if (negative.length) {
         warn('pie-negative-value', `饼图 / 玫瑰图不适合表达负值，检测到 ${negative.length} 行负数。`, 'encoding.value');
       }
+    }
+    if (valueIndex >= 0 && (kind === 'gauge' || kind === 'liquid') && dataset.rows.length > 1) {
+      warn('single-value-kind', `kind「${kind}」只画一个值，${dataset.rows.length} 行数据里只有第一行会被用到。`, 'data.rows');
+    }
+    return finish(errors, warnings);
+  }
+
+  // 雷达图：x 列是指标、y 列是数值、series 列把数据拆成多个多边形
+  if (kind === 'radar') {
+    const indicatorIndex = needColumn(encoding.x, 'encoding.x', true);
+    const valueIndex = needNumeric(toArray(encoding.y)[0], 'encoding.y', true);
+    const groupIndex = encoding.series ? needColumn(encoding.series, 'encoding.series', false) : -1;
+    if (toArray(encoding.y).length > 1) {
+      warn('radar-single-y', '雷达图的 y 只取第一个列名；多组数据请用 encoding.series 指定分组列。', 'encoding.y');
+    }
+    if (indicatorIndex >= 0 && valueIndex >= 0) {
+      const indicators = new Set(dataset.rows.map((row) => String(row[indicatorIndex])));
+      const groups = new Set(dataset.rows.map((row) => (groupIndex >= 0 ? String(row[groupIndex]) : '—')));
+      const present = dataset.rows.filter((row) => isFinite(Number(row[valueIndex]))).length;
+      const expected = indicators.size * groups.size;
+      if (indicators.size < 3) warn('radar-too-few-indicators', `只有 ${indicators.size} 个指标，雷达图至少要 3 个才成形。`, 'encoding.x');
+      if (present < expected) {
+        warn('radar-missing-value', `有 ${expected - present} 个「指标 × 分组」组合没有数据，会按 0 处理。`, 'data.rows');
+      }
+    }
+    return finish(errors, warnings);
+  }
+
+  // 热力图：两个类目列 + 一个数值列
+  if (kind === 'heatmap') {
+    needColumn(encoding.x, 'encoding.x', true);
+    needColumn(encoding.y, 'encoding.y', true);
+    needNumeric(encoding.value || encoding.color, encoding.value ? 'encoding.value' : 'encoding.color', true);
+    return finish(errors, warnings);
+  }
+
+  // K 线：四列 OHLC，顺序固定为 [开, 收, 低, 高]
+  if (kind === 'candlestick') {
+    needColumn(encoding.x, 'encoding.x', true);
+    const columns = toArray(encoding.y);
+    if (columns.length !== 4) {
+      fail('ohlc-needs-four-columns', `K 线的 encoding.y 必须是四列，按 [开, 收, 低, 高] 顺序给出（当前 ${columns.length} 列）。`, 'encoding.y');
+    } else {
+      for (const name of columns) needNumeric(name, 'encoding.y', true);
+    }
+    return finish(errors, warnings);
+  }
+
+  // 瀑布图：项目 + 增减值，可选的合计标记列
+  if (kind === 'waterfall') {
+    needColumn(encoding.name, 'encoding.name', true);
+    needNumeric(encoding.value, 'encoding.value', true);
+    if (encoding.total) needColumn(encoding.total, 'encoding.total', false);
+    return finish(errors, warnings);
+  }
+
+  // 桑基图：起点 / 终点 / 流量 三列
+  if (kind === 'sankey') {
+    needColumn(encoding.source, 'encoding.source', true);
+    needColumn(encoding.target, 'encoding.target', true);
+    const valueIndex = needNumeric(encoding.value, 'encoding.value', true);
+    if (valueIndex >= 0) {
+      const invalid = dataset.rows.filter((row) => {
+        const n = Number(row[valueIndex]);
+        return isFinite(n) && n <= 0;
+      }).length;
+      if (invalid) warn('sankey-non-positive', `${invalid} 行流量不是正数，这些连线会被跳过。`, 'encoding.value');
     }
     return finish(errors, warnings);
   }

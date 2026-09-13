@@ -11,7 +11,7 @@
 
 export const CHART_DSL_SCHEMA_VERSION = 1;
 
-/** 支持的图表类型。带 `data`/`encoding` 编译的是前六种，其余走直通（直接给 `series`）。 */
+/** 支持的图表类型。见 `CHART_DSL_COMPILED_KINDS`：没进编译清单的走直通（直接给 `series`）。 */
 export const CHART_DSL_KINDS = [
   'line',
   'area',
@@ -35,8 +35,27 @@ export const CHART_DSL_KINDS = [
 
 export type ChartDslKind = (typeof CHART_DSL_KINDS)[number];
 
-/** 有 data/encoding → option 编译路径的类型。 */
-export const CHART_DSL_COMPILED_KINDS: ChartDslKind[] = ['line', 'area', 'bar', 'pie', 'scatter', 'function'];
+/** 有 data/encoding → option 编译路径的类型（其余直通）。 */
+export const CHART_DSL_COMPILED_KINDS: ChartDslKind[] = [
+  // 直角坐标
+  'line',
+  'area',
+  'bar',
+  'scatter',
+  'candlestick',
+  'waterfall',
+  'heatmap',
+  // 关系 / 分层
+  'sankey',
+  // 极坐标与单体
+  'pie',
+  'radar',
+  'funnel',
+  'gauge',
+  'liquid',
+  // 函数
+  'function',
+];
 
 export type ChartDslCell = string | number | boolean | null | undefined;
 
@@ -65,6 +84,12 @@ export interface ChartDslEncoding {
   name?: string;
   /** 数值列（饼图 / 漏斗 / 仪表盘 / 水位球等单值类型）。 */
   value?: string;
+  /** 瀑布图：标记「合计」行的列（该行取值非空且不是 false / 0 即视为合计项）。 */
+  total?: string;
+  /** 桑基图：连线起点列。 */
+  source?: string;
+  /** 桑基图：连线终点列。 */
+  target?: string;
 }
 
 export interface ChartDslDocument {
