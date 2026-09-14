@@ -124,6 +124,29 @@ if (!result.valid) console.log(result.errors.map((e) => e.message).join('\n'));
   区间宽度为 0（`annotation-empty-area`）是**警告**。
 - 逃生舱照常：`options.annotation` 能整体覆盖顶层 `annotation`。
 
+## 主题：一条链路贯通图表与引擎
+
+DSL 里的主题走图表的 `options.theme`（`'light'` / `'dark'` / `'auto'` / 部分主题片段），
+**图表层再把它映射到引擎主题**（引擎 2.4 起）：图表实例里那些「引擎自己画的东西」
+（引擎默认样式、选中框 / 手柄 / 插槽这些交互外壳、应用后加的自定义图元）会跟着一起换。
+
+```json
+{
+  "kind": "line",
+  "data": { "columns": ["月份", "销量"], "rows": [["1月", 120], ["2月", 132]] },
+  "encoding": { "x": "月份", "y": "销量" },
+  "options": {
+    "theme": "dark"
+  }
+}
+```
+
+- `theme: 'auto'` = 跟随**引擎实例主题**（按引擎主题背景色的亮度判定明暗）——
+  图表渲染在别人的暗色画布上时，写 `auto` 即可，不用自己判断。
+- 需要品牌色就传片段：`"theme": { "colorPalette": ["#0d6efd", "#10b981"], "textColor": "#212529" }`
+  （浅合并到亮色主题），映射到引擎的那一份会自动跟着算。
+- 完整的映射表见 `ice-chart` 仓库的 `src/theme/chartEngineBridge.ts`。
+
 ## 诊断：给 agent 的自修复反馈
 
 `validateChartDsl()` **不抛异常**，返回结构化诊断（`{ severity, code, message, path }`）：

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.2
+
+### 文档：主题链路写清楚（无代码改动）
+
+- README 补《主题：一条链路贯通图表与引擎》一节：DSL 的 `options.theme`（`light` / `dark` / `auto` /
+  片段）→ 图表主题 → 引擎主题（引擎 2.4 起，`ice-chart@0.21.0` 的 `chartEngineBridge`）。
+  说明 `auto` = 跟随引擎实例主题，以及品牌色片段怎么写。
+
+### 依赖
+
+- devDependency 对齐 **@damoqiongqiu/ice-chart `^0.21.0`**、**ice-render `^2.4.0`**（peer 范围不变）。
+
 ## 0.2.1
 
 ### 变更：依赖对齐家族新版本（无代码改动）
