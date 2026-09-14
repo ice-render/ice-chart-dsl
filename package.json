@@ -1,6 +1,6 @@
 {
   "name": "@damoqiongqiu/ice-chart-dsl",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "license": "MIT",
   "author": "大漠穷秋",
   "description": "A JSON-first DSL layer for AI agents to build charts with ice-chart.",
@@ -51,7 +51,7 @@
     "@babel/core": "7.28.5",
     "@babel/preset-env": "7.28.5",
     "@babel/preset-typescript": "7.28.5",
-    "@damoqiongqiu/ice-chart": "^0.20.1",
+    "@damoqiongqiu/ice-chart": "^0.21.0",
     "@rollup/plugin-babel": "6.1.0",
     "@rollup/plugin-commonjs": "28.0.1",
     "@rollup/plugin-json": "6.1.0",
