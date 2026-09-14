@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1
+
+### 变更：依赖对齐家族新版本（无代码改动）
+
+- devDependency 对齐 **ice-render `^2.4.0`** 与 **@damoqiongqiu/ice-chart `^0.20.1`**，
+  并在新引擎上重跑门禁（单测 45 个全绿）。
+- peer 范围不动：`ice-render ^2.3.0` 与 `@damoqiongqiu/ice-chart ^0.20.0` 本身就被新版本满足
+  —— 本包只产出 option / DSL，不直接调用引擎的主题 API。
+
 ## 0.2.0
 
 ### 新增：标注 `annotation`（目标线 / 阈值线 / 异常点 / 目标区间）
