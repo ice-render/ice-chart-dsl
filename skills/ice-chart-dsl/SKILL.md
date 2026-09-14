@@ -1,7 +1,7 @@
 ---
 name: ice-chart-dsl
 description: Build interactive ice-chart charts from a JSON-first DSL — a table plus an encoding that binds columns to channels, with structured diagnostics for self-repair.
-version: "0.1.3"
+version: "0.2.0"
 category: ux
 platforms:
   - claude-code
@@ -73,6 +73,39 @@ npm install @damoqiongqiu/ice-chart-dsl @damoqiongqiu/ice-chart ice-render
 - `encoding.source` + `encoding.target` + `encoding.value` make a `sankey`.
 - `kind: "function"` needs `expression` (+ optional `domain`, `params`) and no data.
 
+## Annotations (goal lines / thresholds / target bands)
+
+Business charts almost always need a **reference layer** on top of the series — a goal line,
+an SLA threshold, an event marker, a target band. That is one field, not a new chart type:
+
+```json
+{
+  "kind": "line",
+  "data": { "columns": ["月份", "销量"], "rows": [["1月", 120], ["2月", 132]] },
+  "encoding": { "x": "月份", "y": "销量" },
+  "annotation": {
+    "lines": [
+      { "axis": "y", "value": 150, "text": "目标 150" },
+      { "axis": "y", "value": 100, "text": "告警阈值", "color": "#dc3545" },
+      { "axis": "x", "value": "2月", "text": "上线" }
+    ],
+    "points": [{ "x": "2月", "y": 132, "text": "异常点", "symbol": "diamond" }],
+    "areas": [{ "axis": "y", "from": 0, "to": 100, "text": "达标区" }]
+  }
+}
+```
+
+- `value` / `from` / `to` / `x` / `y` are **data values**, not pixels: numbers on a numeric axis,
+  category names (or indexes) on a category axis, timestamps or date strings on a time axis.
+- Annotations live on the coordinate system, so they follow zoom / pan, stay out of the legend,
+  do not occupy data indexes, and never steal hit-testing from the series.
+- Only cartesian kinds (`line` / `area` / `bar` / `scatter`) can host annotations; using them on
+  `pie` / `radar` / `sankey` / … raises `annotation-non-cartesian` (those scenes have no x/y axes).
+- Structural mistakes are **errors** (`missing-annotation-value`: missing `value`, or `from` without
+  `to`); suspicious values are **warnings** (`annotation-unknown-category`,
+  `annotation-value-type`, `annotation-empty-area`). Out-of-range values are simply not drawn —
+  `chart.annotationDiagnostics()` gives the reason at runtime.
+
 ## API
 
 ```ts
@@ -102,6 +135,6 @@ Example feedback:
 ## Reference
 
 - package: `@damoqiongqiu/ice-chart-dsl` (npm)
-- runtime peer dependencies: `@damoqiongqiu/ice-chart@^0.19.0` +
+- runtime peer dependencies: `@damoqiongqiu/ice-chart@^0.20.0` （标注需要 0.20.0 起）+
   `ice-render@^2.3.0`（家族当前引擎 `2.3.0`，建议直接装最新）
 - schema: `src/schema/chart-dsl.schema.json`

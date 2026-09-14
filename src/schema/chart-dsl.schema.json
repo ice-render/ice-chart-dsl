@@ -75,6 +75,58 @@
         }
       ]
     },
+    "annotation": {
+      "description": "标注图层（目标线 / 阈值线 / 异常点 / 目标区间）。值都用数据值，不是像素；只对直角坐标的 kind 有效。",
+      "type": "object",
+      "properties": {
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["value"],
+            "properties": {
+              "axis": { "enum": ["x", "y"], "description": "y（默认）画水平线，x 画垂直线" },
+              "value": { "oneOf": [{ "type": "number" }, { "type": "string" }], "description": "数据值：数值轴写数字，类目轴写类目名或下标" },
+              "text": { "type": "string" },
+              "color": { "type": "string" },
+              "dashed": { "type": "boolean", "description": "默认 true" },
+              "textPosition": { "enum": ["start", "center", "end"] }
+            }
+          }
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["x", "y"],
+            "properties": {
+              "x": { "oneOf": [{ "type": "number" }, { "type": "string" }] },
+              "y": { "type": "number" },
+              "text": { "type": "string" },
+              "color": { "type": "string" },
+              "symbol": { "enum": ["circle", "rect", "diamond", "triangle"] },
+              "textPosition": { "enum": ["top", "bottom", "left", "right"] }
+            }
+          }
+        },
+        "areas": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to"],
+            "properties": {
+              "axis": { "enum": ["x", "y"], "description": "y（默认）是横向的带，x 是纵向的带" },
+              "from": { "oneOf": [{ "type": "number" }, { "type": "string" }] },
+              "to": { "oneOf": [{ "type": "number" }, { "type": "string" }] },
+              "color": { "type": "string" },
+              "text": { "type": "string" },
+              "textPosition": { "enum": ["start", "center", "end"] }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "expression": { "type": "string", "description": "kind 为 function / parametric 时的公式" },
     "domain": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
     "params": { "type": "object", "additionalProperties": { "type": "number" } },

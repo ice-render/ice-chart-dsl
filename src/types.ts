@@ -92,11 +92,71 @@ export interface ChartDslEncoding {
   target?: string;
 }
 
+/** 标注的定位轴：`'y'`（默认）画水平线，`'x'` 画垂直线。 */
+export type ChartDslAnnotationAxis = 'x' | 'y';
+
+/**
+ * 标注线：目标线 / 阈值线 / 告警线。
+ *
+ * `value` 是**数据值**，不是像素：数值轴写数字，类目轴写类目名（或下标）。
+ * 定位由 ice-chart 按坐标轴比例尺算，因此缩放 / 平移后线会跟着走。
+ */
+export interface ChartDslAnnotationLine {
+  axis?: ChartDslAnnotationAxis;
+  value: number | string;
+  text?: string;
+  color?: string;
+  /** 是否虚线，默认 true。 */
+  dashed?: boolean;
+  /** 文字沿线的位置，默认 `'end'`。 */
+  textPosition?: 'start' | 'center' | 'end';
+}
+
+/** 标注点：异常点 / 事件点。`x` 与 `y` 都是数据值。 */
+export interface ChartDslAnnotationPoint {
+  x: number | string;
+  y: number;
+  text?: string;
+  color?: string;
+  symbol?: 'circle' | 'rect' | 'diamond' | 'triangle';
+  textPosition?: 'top' | 'bottom' | 'left' | 'right';
+}
+
+/** 标注区间：达标区 / 维护窗口。`from` / `to` 是同一根轴上的两个数据值。 */
+export interface ChartDslAnnotationArea {
+  axis?: ChartDslAnnotationAxis;
+  from: number | string;
+  to: number | string;
+  color?: string;
+  text?: string;
+  textPosition?: 'start' | 'center' | 'end';
+}
+
+/**
+ * 标注图层（目标线 / 阈值线 / 异常点 / 目标区间）。
+ *
+ * 它是**挂在坐标系上的一个图层**，不是新的图表类型：不进图例、不占数据下标，
+ * 也不参与命中测试。越界的标注不会被画出来（ice-chart 会在
+ * `chart.annotationDiagnostics()` 里给出原因，本包在编译期就把明显写错的挡下来）。
+ */
+export interface ChartDslAnnotation {
+  lines?: ChartDslAnnotationLine[];
+  points?: ChartDslAnnotationPoint[];
+  areas?: ChartDslAnnotationArea[];
+}
+
 export interface ChartDslDocument {
   schemaVersion?: number;
   kind: ChartDslKind;
   data?: ChartDslDataset;
   encoding?: ChartDslEncoding;
+  /**
+   * 标注图层：目标线 / 阈值线 / 异常点 / 目标区间。
+   *
+   * 只对**直角坐标**的 kind 有意义（line / area / bar / scatter）；给饼图 / 雷达 / 桑基等
+   * 会被警告（那些场景没有 x/y 坐标系，标准无处可放）。
+   */
+  annotation?: ChartDslAnnotation;
   /** 标题：字符串等价于 `{ text }`。 */
   title?: string | { text?: string; subtext?: string };
   /** `kind: 'function'` 的表达式与参数（y = f(x)）。 */

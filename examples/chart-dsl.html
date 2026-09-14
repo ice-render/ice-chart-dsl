@@ -69,6 +69,8 @@
           <button data-preset="candlestick">K 线</button>
           <button data-preset="waterfall">瀑布</button>
           <button data-preset="sankey">桑基</button>
+          <button data-preset="annotation">标注（目标线 / 达标区）</button>
+          <button data-preset="bad-annotation">标注错误示例</button>
           <button data-preset="bad-column">错误示例</button>
         </div>
         <textarea id="dsl" spellcheck="false"></textarea>
@@ -229,6 +231,34 @@
           kind: 'line',
           data: { columns: ['月份', '销量'], rows: [['1月', 120], ['2月', 132]] },
           encoding: { x: '月份', y: '销售额' },
+        },
+        annotation: {
+          schemaVersion: 1,
+          kind: 'line',
+          title: '月度销量与目标（annotation）',
+          data: {
+            columns: ['月份', '销量'],
+            rows: [['1月', 120], ['2月', 132], ['3月', 101], ['4月', 88], ['5月', 156], ['6月', 174]],
+          },
+          encoding: { x: '月份', y: '销量' },
+          annotation: {
+            lines: [
+              { axis: 'y', value: 150, text: '目标 150' },
+              { axis: 'y', value: 100, text: '告警阈值 100', color: '#dc3545', textPosition: 'start' },
+              { axis: 'x', value: '4月', text: '促销' },
+            ],
+            points: [{ x: '4月', y: 88, text: '异常点', color: '#dc3545', symbol: 'diamond' }],
+            areas: [{ axis: 'y', from: 0, to: 100, text: '达标区', textPosition: 'start' }],
+          },
+        },
+        'bad-annotation': {
+          schemaVersion: 1,
+          kind: 'line',
+          data: { columns: ['月份', '销量'], rows: [['1月', 120], ['2月', 132]] },
+          encoding: { x: '月份', y: '销量' },
+          annotation: {
+            lines: [{ axis: 'y', text: '忘了写值' }, { axis: 'x', value: '13月', text: '不存在的月份' }],
+          },
         },
       };
 
