@@ -2,6 +2,46 @@ import { normalizeOption } from '@damoqiongqiu/ice-chart';
 import { compileChartDsl, ChartDslCompileError } from '../src/index';
 
 describe('compileChartDsl：encoding → ChartOption', () => {
+  it('annotation 原样进 option（标注是图层，不是系列）', () => {
+    const annotation = {
+      lines: [{ axis: 'y', value: 300, text: '目标 300' }],
+      points: [{ x: '2月', y: 132, text: '异常点' }],
+      areas: [{ axis: 'y', from: 0, to: 100, text: '达标区' }],
+    };
+    const option: any = compileChartDsl({
+      kind: 'line',
+      data: { columns: ['月份', '销量'], rows: [['1月', 120], ['2月', 132], ['3月', 101]] },
+      encoding: { x: '月份', y: '销量' },
+      annotation,
+    });
+    expect(option.annotation).toEqual(annotation);
+    // 标注不是系列：系列数不变，图例 / 数据下标都不受影响
+    expect(option.series).toHaveLength(1);
+    // 归一化之后仍然在（标注要能进快照 / DSL 往返）
+    expect((normalizeOption(option) as any).option.annotation).toEqual(annotation);
+  });
+
+  it('逃生舱 options.annotation 能整体覆盖顶层 annotation', () => {
+    const option: any = compileChartDsl({
+      kind: 'line',
+      data: { columns: ['月份', '销量'], rows: [['1月', 120], ['2月', 132]] },
+      encoding: { x: '月份', y: '销量' },
+      annotation: { lines: [{ axis: 'y', value: 1 }] },
+      options: { annotation: { lines: [{ axis: 'y', value: 2, text: '覆盖' }] } },
+    });
+    expect(option.annotation.lines[0]).toMatchObject({ value: 2, text: '覆盖' });
+  });
+
+  it('series 直通时 annotation 也照常带上', () => {
+    const option: any = compileChartDsl({
+      kind: 'line',
+      series: [{ type: 'line', data: [1, 2, 3] }],
+      annotation: { lines: [{ axis: 'y', value: 2 }] },
+    } as any);
+    expect(option.series).toHaveLength(1);
+    expect(option.annotation).toEqual({ lines: [{ axis: 'y', value: 2 }] });
+  });
+
   it('类目 x + 单 y → 类目轴 + 一个系列', () => {
     const option: any = compileChartDsl({
       kind: 'bar',

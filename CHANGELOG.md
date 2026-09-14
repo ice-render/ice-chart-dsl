@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.2.0
+
+### 新增：标注 `annotation`（目标线 / 阈值线 / 异常点 / 目标区间）
+
+业务里最高频的「目标线 / SLA 阈值 / 达标区 / 异常点」以前只能要么加一个系列、要么自己往
+`options` 里塞配置。现在它是 DSL 的**一等字段**，与 `encoding` 平级：
+
+```json
+{
+  "kind": "line",
+  "data": { "columns": ["月份", "销量"], "rows": [["1月", 120], ["2月", 132]] },
+  "encoding": { "x": "月份", "y": "销量" },
+  "annotation": {
+    "lines": [{ "axis": "y", "value": 150, "text": "目标 150" }],
+    "points": [{ "x": "2月", "y": 132, "text": "异常点", "symbol": "diamond" }],
+    "areas": [{ "axis": "y", "from": 0, "to": 100, "text": "达标区" }]
+  }
+}
+```
+
+- **值用数据值，不是像素**：数值轴写数字、类目轴写类目名（或下标）、时间轴写时间戳 / 日期串。
+  定位由 ice-chart 按比例尺算，所以标注跟着缩放 / 平移走，不进图例、不占数据下标、不抢命中。
+- 编译产物里 `annotation` 原样交给 ice-chart（`normalizeAnnotation` + `resolveAnnotation` 负责
+  收拢与定位）；`options.annotation` 逃生舱依然能整体覆盖。
+- 标注只对**直角坐标**的 kind 有意义（`line` / `area` / `bar` / `scatter`），
+  给 `pie` / `radar` / `sankey` 等会被警告 `annotation-non-cartesian`。
+
+### 新增：标注的编译期诊断
+
+- **错误**（一定画不出来，必须改）：`missing-annotation-value`（缺 `value` / `from` / `to` / `x` / `y`）、
+  `invalid-annotation-list`（`lines` / `points` / `areas` 不是数组）、`invalid-annotation-item`（元素不是对象）。
+- **警告**（能编译，但可能不是你要的）：`annotation-unknown-category`（类目名不在 x 列里，
+  会带上「该列有几个类目」）、`annotation-value-type`（数值轴写了非数字）、
+  `annotation-empty-area`（`from` 与 `to` 相同，宽度为 0）、`unknown-annotation-field`。
+- 诊断路径精确到条目：`annotation.lines[0].value`，agent 可以直接定位改哪一行。
+- 越界（值在可视域外）不在编译期判：它取决于运行时的缩放窗口，
+  由 ice-chart 的 `chart.annotationDiagnostics()` 在运行时给出原因（线不画、但说明为什么）。
+
+### 变更：依赖范围
+
+- peer / dev 升到 **@damoqiongqiu/ice-chart `^0.20.0`**（标注是 0.20.0 起的能力）+ ice-render `^2.3.0`。
+
+### 验证
+
+- 单测 37 → **45 个**：编译（`annotation` 进 option、逃生舱覆盖、`series` 直通也带上）、
+  校验（结构错误的路径、四种警告、非直角坐标警告）、以及编译产物必须能过核心的 `normalizeOption`。
+- 文档：README 字段表与示例、SKILL（agent 用）、`prompts/agent-prompt.md`、
+  `src/schema/chart-dsl.schema.json` 同步。
+
 ## 0.1.3
 
 ### 变更：依赖范围对齐家族新版本（无代码改动）

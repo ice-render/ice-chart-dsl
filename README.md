@@ -90,6 +90,40 @@ if (!result.valid) console.log(result.errors.map((e) => e.message).join('\n'));
 **直通**：`treemap` / `graph` / `parametric` / `boxplot` 等直接给 `series`（`options` 照常透传）。
 **逃生舱**：`options` 里的键覆盖编译结果（`series` 除外），所以 DSL 跟不上核心演进时不会把人堵死。
 
+## 标注：目标线 / 阈值线 / 异常点 / 目标区间
+
+业务图上最高频的参考线不是「一种新图表」，而是一条配置 —— 顶层 `annotation`（与 `encoding` 平级）：
+
+```json
+{
+  "schemaVersion": 1,
+  "kind": "line",
+  "title": "月度销量与目标",
+  "data": { "columns": ["月份", "销量"], "rows": [["1月", 120], ["2月", 132], ["3月", 101]] },
+  "encoding": { "x": "月份", "y": "销量" },
+  "annotation": {
+    "lines": [
+      { "axis": "y", "value": 150, "text": "目标 150" },
+      { "axis": "y", "value": 100, "text": "告警阈值", "color": "#dc3545" },
+      { "axis": "x", "value": "2月", "text": "上线" }
+    ],
+    "points": [{ "x": "3月", "y": 101, "text": "异常点", "symbol": "diamond" }],
+    "areas": [{ "axis": "y", "from": 0, "to": 100, "text": "达标区" }]
+  }
+}
+```
+
+- `lines[].value` / `areas[].from`、`to` / `points[].x`、`y` 都是**数据值**（不是像素）：
+  数值轴写数字、类目轴写类目名或下标、时间轴写时间戳或日期串。
+- 它挂在坐标系上，所以**跟着缩放 / 平移走**，不进图例、不占数据下标、不抢命中测试；
+  越界的标注不画，原因由 ice-chart 的 `chart.annotationDiagnostics()` 给出。
+- 只对直角坐标的 kind 有意义（`line` / `area` / `bar` / `scatter`）；
+  给饼图 / 雷达 / 桑基等会被警告 `annotation-non-cartesian`。
+- 编译期诊断：缺 `value` / 缺 `from`+`to` 是**错误**（带 `annotation.lines[0].value` 这样的路径），
+  类目不存在（`annotation-unknown-category`）、数值轴写了非数字（`annotation-value-type`）、
+  区间宽度为 0（`annotation-empty-area`）是**警告**。
+- 逃生舱照常：`options.annotation` 能整体覆盖顶层 `annotation`。
+
 ## 诊断：给 agent 的自修复反馈
 
 `validateChartDsl()` **不抛异常**，返回结构化诊断（`{ severity, code, message, path }`）：
@@ -101,6 +135,8 @@ if (!result.valid) console.log(result.errors.map((e) => e.message).join('\n'));
 [警告] 饼图 / 玫瑰图不适合表达负值，检测到 2 行负数。（encoding.value）
 [错误] 表达式错误：缺少右括号（位置 6）… （expression）
 [警告] 参数「b」定义了但表达式没有用到。（expression）
+[错误] annotation.lines[0] 缺少 value（数值轴写数字、类目轴写类目名或下标）。（annotation.lines[0].value）
+[警告] annotation.lines[1].value 的类目名「13月」不在 x 列里（该列有 3 个类目），这条标注不会画出来。（annotation.lines[1].value）
 ```
 
 公式类会**采样一遍再诊断**：静态检查抓语法错误，运行层抓「整段开不出来」「输出恒定」——

@@ -16,6 +16,9 @@
    - 同一横轴上要分组时用 `series` 指定分组列；
    - 气泡图再加 `size`；饼图用 `name` + `value`。
 4. 需要时用 `options` 覆盖默认值（`theme` / `legend` / `tooltip` / `interaction` / `stack` …）。
+   用户提到「目标线 / 阈值线 / 达标区 / 异常点 / 预算线 / SLA」这类**参考线**时，
+   不要加系列、也不要自己画：写顶层的 `annotation`（`lines` / `points` / `areas`），
+   值用**数据值**（数值轴写数字、类目轴写类目名），它会跟着坐标系走且不进图例。
 5. **把 `validateChartDsl` 的诊断当成编译错误来对待**：有 `[错误]` 就按提示改（它会给可用列名），
    有 `[警告]` 就在回答里提一句（例如"饼图里有负值，已按绝对值口径说明"）。
 
@@ -45,6 +48,22 @@
 
 ```json
 { "schemaVersion": 1, "kind": "function", "expression": "a*sin(x)/x", "domain": [-10, 10], "params": { "a": 1.5 } }
+```
+
+带目标线与达标区的业务图（**注意 `annotation` 与 `encoding` 平级**）：
+
+```json
+{
+  "schemaVersion": 1,
+  "kind": "line",
+  "title": "月度销量与目标",
+  "data": { "columns": ["月份", "销量"], "rows": [["1月", 120], ["2月", 132], ["3月", 101]] },
+  "encoding": { "x": "月份", "y": "销量" },
+  "annotation": {
+    "lines": [{ "axis": "y", "value": 150, "text": "目标 150" }],
+    "areas": [{ "axis": "y", "from": 0, "to": 100, "text": "达标区" }]
+  }
+}
 ```
 
 写错时你会拿到这样的反馈，照着改即可：

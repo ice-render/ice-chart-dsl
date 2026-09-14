@@ -15,6 +15,79 @@ const LINE = {
 };
 
 describe('validateChartDsl', () => {
+  it('annotation：合法的标注不产生诊断', () => {
+    const result = validateChartDsl({
+      ...LINE,
+      annotation: {
+        lines: [{ axis: 'y', value: 300, text: '目标 300' }, { axis: 'x', value: '2月', text: '上线' }],
+        points: [{ x: '1月', y: 120 }],
+        areas: [{ axis: 'y', from: 0, to: 100 }],
+      },
+    });
+    expect(result.valid).toBe(true);
+    expect(result.errors).toHaveLength(0);
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  it('annotation：缺 value / 缺 from+to 是错误，且带精确路径', () => {
+    const missingValue = validateChartDsl({
+      ...LINE,
+      annotation: { lines: [{ axis: 'y', text: '忘了写值' }] },
+    });
+    expect(missingValue.valid).toBe(false);
+    expect(missingValue.errors[0].code).toBe('missing-annotation-value');
+    expect(missingValue.errors[0].path).toBe('annotation.lines[0].value');
+
+    const missingTo = validateChartDsl({
+      ...LINE,
+      annotation: { areas: [{ axis: 'y', from: 0 }] },
+    });
+    expect(missingTo.errors.map((e) => e.path)).toContain('annotation.areas[0].to');
+
+    const missingPointY = validateChartDsl({
+      ...LINE,
+      annotation: { points: [{ x: '1月' }] },
+    });
+    expect(missingPointY.errors[0].path).toBe('annotation.points[0].y');
+
+    const wrongShape = validateChartDsl({ ...LINE, annotation: { lines: { value: 1 } } });
+    expect(wrongShape.errors[0].code).toBe('invalid-annotation-list');
+  });
+
+  it('annotation：值可能对不上时给警告（不阻塞编译）', () => {
+    // 数值 y 轴写了非数字
+    const yString = validateChartDsl({ ...LINE, annotation: { lines: [{ axis: 'y', value: '高峰' }] } });
+    expect(yString.valid).toBe(true);
+    expect(yString.warnings.map((w) => w.code)).toContain('annotation-value-type');
+
+    // 类目 x 轴写了一个不存在的类目
+    const unknownCategory = validateChartDsl({ ...LINE, annotation: { lines: [{ axis: 'x', value: '13月' }] } });
+    expect(unknownCategory.valid).toBe(true);
+    expect(unknownCategory.warnings[0].code).toBe('annotation-unknown-category');
+    expect(unknownCategory.warnings[0].message).toContain('13月');
+
+    // 宽度为 0 的区间
+    const emptyArea = validateChartDsl({ ...LINE, annotation: { areas: [{ axis: 'y', from: 100, to: 100 }] } });
+    expect(emptyArea.warnings.map((w) => w.code)).toContain('annotation-empty-area');
+  });
+
+  it('annotation：非直角坐标的 kind 会被警告（那里没有坐标系放标注）', () => {
+    const result = validateChartDsl({
+      kind: 'pie',
+      data: [{ 名称: 'A', 数值: 3 }, { 名称: 'B', 数值: 5 }],
+      encoding: { name: '名称', value: '数值' },
+      annotation: { lines: [{ axis: 'y', value: 1 }] },
+    });
+    expect(result.valid).toBe(true);
+    expect(result.warnings.map((w) => w.code)).toContain('annotation-non-cartesian');
+  });
+
+  it('annotation：未知字段会被忽略并提示', () => {
+    const result = validateChartDsl({ ...LINE, annotation: { marks: [], lines: [] } });
+    expect(result.valid).toBe(true);
+    expect(result.warnings.map((w) => w.code)).toContain('unknown-annotation-field');
+  });
+
   it('通过的 DSL 返回 valid 且没有诊断', () => {
     const result = validateChartDsl(LINE);
     expect(result.valid).toBe(true);

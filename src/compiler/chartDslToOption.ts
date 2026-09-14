@@ -65,6 +65,12 @@ export function compileChartDsl(dsl: ChartDslDocument): ChartOption {
     Object.assign(option, compileByKind(dsl, dataset, kind));
   }
 
+  // 标注图层：原样交给 ice-chart（它的 normalizeAnnotation 负责收拢形状、解析层负责定位）。
+  // 放在逃生舱之前，所以 `options.annotation` 依然能整体覆盖它。
+  if (dsl.annotation && typeof dsl.annotation === 'object') {
+    option.annotation = dsl.annotation;
+  }
+
   if (dsl.options && typeof dsl.options === 'object') {
     for (const key of Object.keys(dsl.options)) {
       const value = (dsl.options as any)[key];
