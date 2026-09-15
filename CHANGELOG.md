@@ -10,6 +10,17 @@
   并用 `npm run verify:full` 串起类型检查 → jest → build → e2e。
 - 纯开发期基建，**运行时行为未变**，故不发版。
 
+## 0.2.7 - 2026-09-15
+
+### 变更
+
+- **dev 依赖对齐**：`ice-render` → `^2.11.2`、`@damoqiongqiu/ice-chart` → `^0.23.3`。
+  peer 范围不动（`ice-render ^2.10.0`、`@damoqiongqiu/ice-chart ^0.23.2`）—— 两个范围本来就已经允许新版本。
+  本包只把「一张表 + encoding」编译成图表 option，引擎这次改的是对齐引导的候选目标范围，
+  对本包是空操作，**不含功能变更**。
+- 门禁（在 chart 0.23.3 + 引擎 2.11.2 上重跑）：`types:check` ✅、jest 45/45 ✅、build ✅、
+  示例页 e2e 冒烟（chart-dsl.html 无报错且画布有内容）✅。
+
 ## 0.2.6 - 2026-09-15
 
 ### 变更
