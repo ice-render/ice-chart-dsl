@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### 变更
+
+- **补上示例页真机冒烟**：本仓此前**连 playwright 配置都没有**，`examples/chart-dsl.html`
+  从未被浏览器跑过。现在有 `playwright.config.ts`（端口 8096，家族端口表已登记）与目录驱动的
+  `e2e/examples-smoke.spec.ts`（判据：无 console/pageerror、无 4xx、画布**真有落墨**），
+  并用 `npm run verify:full` 串起类型检查 → jest → build → e2e。
+- 纯开发期基建，**运行时行为未变**，故不发版。
+
 ## 0.2.6 - 2026-09-15
 
 ### 变更
