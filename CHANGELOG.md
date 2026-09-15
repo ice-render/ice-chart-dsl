@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.6 - 2026-09-15
+
+### 变更
+
+- **peer / dev 依赖对齐当前发布**：`@damoqiongqiu/ice-chart ^0.23.0 → ^0.23.2`、
+  `ice-render ^2.8.0 → ^2.10.0`。本包是编译器（产出 ChartOption），只需要声明范围对齐；
+  验证：tsc + jest 45/45 + build，编译产物再过一遍 core 的 `normalizeOption`（集成断言）。
+
 ## 0.2.5 - 2026-09-15
 
 ### 变更
