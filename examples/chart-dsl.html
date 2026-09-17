@@ -90,7 +90,7 @@
        * 图表 DSL 渲染示例页。
        *
        * 页面写法与家族其它示例一致：**一页 = 一个类**，构造期把 DOM 引用、事件与首次渲染一次做完。
-       * 这页的"变化"是**用户驱动**的（改 JSON / 换预设后点渲染），不是宿主推数据，所以没有 `onUpdate()`。
+       * 这页的"变化"是**用户驱动**的（改 JSON / 换预设后点渲染），不是宿主推数据，所以刷新入口就是 `onUpdate()`（按钮点它重渲）。
        */
       class ChartDslPage {
         static PRESETS = {
@@ -277,7 +277,7 @@
           this.loadPreset('line');
         }
 
-        render() {
+        onUpdate() {
         let dsl;
         try {
           dsl = JSON.parse(this.$('dsl').value);
@@ -311,14 +311,14 @@
 
         loadPreset(name) {
           this.$('dsl').value = JSON.stringify(ChartDslPage.PRESETS[name], null, 2);
-          this.render();
+          this.onUpdate();
         }
 
         __wireToolbar() {
           document.querySelectorAll('[data-preset]').forEach((button) => {
             button.addEventListener('click', () => this.loadPreset(button.dataset.preset));
           });
-          this.$('btn-render').addEventListener('click', () => this.render());
+          this.$('btn-render').addEventListener('click', () => this.onUpdate());
         }
       }
 
