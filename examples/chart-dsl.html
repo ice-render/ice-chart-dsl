@@ -86,8 +86,14 @@
     <script src="../node_modules/@damoqiongqiu/ice-chart/dist/index.umd.js"></script>
     <script src="../dist/index.umd.js"></script>
     <script>
-      const $ = (id) => document.getElementById(id);
-      const PRESETS = {
+      /**
+       * 图表 DSL 渲染示例页。
+       *
+       * 页面写法与家族其它示例一致：**一页 = 一个类**，构造期把 DOM 引用、事件与首次渲染一次做完。
+       * 这页的"变化"是**用户驱动**的（改 JSON / 换预设后点渲染），不是宿主推数据，所以没有 `onUpdate()`。
+       */
+      class ChartDslPage {
+        static PRESETS = {
         line: {
           schemaVersion: 1,
           kind: 'line',
@@ -262,14 +268,22 @@
         },
       };
 
-      let chart = null;
-      function render() {
+        constructor() {
+          this.$ = (id) => document.getElementById(id);
+          /** 当前图表实例（重渲染前要先 destroy） */
+          this.chart = null;
+
+          this.__wireToolbar();
+          this.loadPreset('line');
+        }
+
+        render() {
         let dsl;
         try {
-          dsl = JSON.parse($('dsl').value);
+          dsl = JSON.parse(this.$('dsl').value);
         } catch (err) {
-          $('diagnostics').innerHTML = '<span class="error">[错误] JSON 解析失败：' + err.message + '</span>';
-          $('meta').textContent = '—';
+          this.$('diagnostics').innerHTML = '<span class="error">[错误] JSON 解析失败：' + err.message + '</span>';
+          this.$('meta').textContent = '—';
           return;
         }
         const result = ICEChartDSL.validateChartDsl(dsl);
@@ -278,32 +292,37 @@
           const tag = item.severity === 'error' ? '[错误]' : '[警告]';
           return '<span class="' + cls + '">' + tag + '</span> ' + item.message + (item.path ? '（' + item.path + '）' : '');
         });
-        $('diagnostics').innerHTML = lines.length ? lines.join('\n') : '<span class="ok">✓ 校验通过</span>';
+        this.$('diagnostics').innerHTML = lines.length ? lines.join('\n') : '<span class="ok">✓ 校验通过</span>';
         if (!result.valid) {
-          $('meta').textContent = '校验不通过：' + result.errors.length + ' 个错误';
+          this.$('meta').textContent = '校验不通过：' + result.errors.length + ' 个错误';
           return;
         }
         try {
           const option = ICEChartDSL.compileChartDsl(dsl);
-          if (chart) chart.destroy();
-          chart = ICEChart.createChart('chart', option);
-          const json = chart.toJSONString();
-          $('meta').textContent =
+          if (this.chart) this.chart.destroy();
+          this.chart = ICEChart.createChart('chart', option);
+          const json = this.chart.toJSONString();
+          this.$('meta').textContent =
             '编译产物：' + option.series.length + ' 个系列 · ' + Math.round(json.length / 1024 * 10) / 10 + ' KB JSON（chart.toJSONString()）';
         } catch (err) {
-          $('diagnostics').innerHTML = '<span class="error">[错误] ' + err.message + '</span>';
+          this.$('diagnostics').innerHTML = '<span class="error">[错误] ' + err.message + '</span>';
+        }
+        }
+
+        loadPreset(name) {
+          this.$('dsl').value = JSON.stringify(ChartDslPage.PRESETS[name], null, 2);
+          this.render();
+        }
+
+        __wireToolbar() {
+          document.querySelectorAll('[data-preset]').forEach((button) => {
+            button.addEventListener('click', () => this.loadPreset(button.dataset.preset));
+          });
+          this.$('btn-render').addEventListener('click', () => this.render());
         }
       }
 
-      function loadPreset(name) {
-        $('dsl').value = JSON.stringify(PRESETS[name], null, 2);
-        render();
-      }
-      document.querySelectorAll('[data-preset]').forEach((button) => {
-        button.addEventListener('click', () => loadPreset(button.dataset.preset));
-      });
-      $('btn-render').addEventListener('click', render);
-      loadPreset('line');
+      new ChartDslPage();
     </script>
   </body>
 </html>

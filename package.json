@@ -1,6 +1,6 @@
 {
   "name": "@damoqiongqiu/ice-chart-dsl",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "license": "MIT",
   "author": "大漠穷秋",
   "description": "A JSON-first DSL layer for AI agents to build charts with ice-chart.",

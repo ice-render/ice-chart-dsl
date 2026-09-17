@@ -2,7 +2,20 @@
 
 ## Unreleased
 
+> 下一个版本发布前，改动在这里累积。
+
+## 0.2.9 - 2026-09-17
+
 ### 变更
+
+- **示例页改成家族统一的「一页一个类」写法**（`examples/chart-dsl.html`）。构造期建好 DOM 引用与
+  事件；`PRESETS` 变 `static` 常量、当前图表实例收进 `this.chart`（重渲前先 destroy）；
+  预设与渲染按钮接线集中到 `__wireToolbar()`。这页的"变化"是**用户驱动**的（改 JSON / 换预设后
+  点渲染），不是宿主推数据，所以按约定不加 `onUpdate()`。示例页不在 npm 包里（`files: ["dist"]`），
+  **不含运行时功能变更**。
+- 门禁：types / jest / build / 真机冒烟 2/2；画布截图前后 sha256 完全相同（0 像素差异）。
+
+### 其它
 
 - **补上示例页真机冒烟**：本仓此前**连 playwright 配置都没有**，`examples/chart-dsl.html`
   从未被浏览器跑过。现在有 `playwright.config.ts`（端口 8096，家族端口表已登记）与目录驱动的
