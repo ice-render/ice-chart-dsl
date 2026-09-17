@@ -38,3 +38,19 @@ ice-chart 的 **agent 友好层**：一张表 + `encoding` → `ChartOption` →
 - `src/compiler/chartDslToOption.ts`：DSL → ChartOption
 - `src/runtime/renderChartDsl.ts`：编译 + 渲染
 - `tests/`：校验与编译用例；**编译产物必须过一遍 core 的 `normalizeOption`**（集成断言）
+
+## 成员顺序（class member order，2026-09-17 定，全家族同口径）
+
+`examples/*.html` 里的页面类按这个顺序排成员 —— 棘轮里就是正则 `S*T*F*C*(A|M)*`：
+
+```
+static 常量/字段  →  static 方法  →  实例字段  →  构造函数  →  访问器 / 实例方法
+```
+
+- **只到这一层**：不查 public/private 的先后，也不查同组内谁先谁后。Google Java Style §3.4.2
+  说 class 成员顺序"**没有唯一正确的配方**"（要的是每种顺序都讲得通、维护者能解释），
+  Google 的 TypeScript 指南对顺序**完全沉默**（全文 "ordering" 出现 0 次）。
+- ⚠️ **挪位置前先分清挪的是什么**：TS 里**方法随便挪**（类定义时方法就全部装好，与文本顺序无关），
+  但**字段的声明顺序有语义**（初始化按声明顺序执行 + 影响 V8 的 class shape）——
+  挪字段要确认初始化表达式互不依赖。
+- 本仓示例页已合规；棘轮是 `tests/examplesConvention.test.ts` 的最后一条。
