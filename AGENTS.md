@@ -54,3 +54,6 @@ static 常量/字段  →  static 方法  →  实例字段  →  构造函数  
   但**字段的声明顺序有语义**（初始化按声明顺序执行 + 影响 V8 的 class shape）——
   挪字段要确认初始化表达式互不依赖。
 - 本仓示例页已合规；棘轮是 `tests/examplesConvention.test.ts` 的最后一条。
+- 示例页的**写法契约**（一页一类、稳定结构的边界、验收清单）单一来源是
+  `ice-web-components/docs/guides/app-pages.md`；本仓示例页是**纯用户驱动**的，所以没有 `onUpdate()`。
+
