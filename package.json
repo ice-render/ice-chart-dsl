@@ -46,14 +46,14 @@
     "verify:full": "npm run verify && npm run test:e2e"
   },
   "peerDependencies": {
-    "@damoqiongqiu/ice-chart": "^0.23.2",
+    "@damoqiongqiu/ice-chart": "^0.27.2",
     "ice-render": "^3.0.0"
   },
   "devDependencies": {
     "@babel/core": "7.28.5",
     "@babel/preset-env": "7.28.5",
     "@babel/preset-typescript": "7.28.5",
-    "@damoqiongqiu/ice-chart": "^0.23.4",
+    "@damoqiongqiu/ice-chart": "^0.27.2",
     "@playwright/test": "^1.63.0",
     "@rollup/plugin-babel": "6.1.0",
     "@rollup/plugin-commonjs": "28.0.1",
