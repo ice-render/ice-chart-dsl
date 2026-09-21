@@ -175,17 +175,6 @@ describe('编译产物必须能被核心消费', () => {
       },
     ],
     [
-      'candlestick',
-      {
-        kind: 'candlestick',
-        data: {
-          columns: ['日期', '开', '收', '低', '高'],
-          rows: [['1月', 10, 12, 9, 13], ['2月', 12, 11, 10, 14]],
-        },
-        encoding: { x: '日期', y: ['开', '收', '低', '高'] },
-      },
-    ],
-    [
       'waterfall',
       {
         kind: 'waterfall',
@@ -243,16 +232,6 @@ describe('新增类型的编译细节', () => {
     expect(option.series[0].data).toEqual([['T1', '华东', 40], ['T1', '华北', 55], ['T2', '华东', 62]]);
   });
 
-  it('candlestick：四列按 [开, 收, 低, 高] 打包', () => {
-    const option: any = compileChartDsl({
-      kind: 'candlestick',
-      data: { columns: ['日期', '开', '收', '低', '高'], rows: [['1月', 10, 12, 9, 13]] },
-      encoding: { x: '日期', y: ['开', '收', '低', '高'] },
-    });
-    expect(option.series[0].data).toEqual([[10, 12, 9, 13]]);
-    expect(option.xAxis.type).toBe('category');
-  });
-
   it('waterfall：total 列标记合计项', () => {
     const option: any = compileChartDsl({
       kind: 'waterfall',
@@ -273,15 +252,6 @@ describe('新增类型的编译细节', () => {
     expect(option.sankey.links).toHaveLength(2);
   });
 
-  it('K 线少给列会明确报错（顺序是有约定的）', () => {
-    const result = compileChartDslSafe({
-      kind: 'candlestick',
-      data: { columns: ['日期', '开', '收'], rows: [['1月', 10, 12]] },
-      encoding: { x: '日期', y: ['开', '收'] },
-    });
-    expect(result.error).toBeTruthy();
-    expect((result.error as any).diagnostics.map((d: any) => d.code)).toContain('ohlc-needs-four-columns');
-  });
 });
 
 function compileChartDslSafe(dsl: any): { option?: any; error?: any } {

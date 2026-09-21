@@ -81,7 +81,6 @@ if (!result.valid) console.log(result.errors.map((e) => e.message).join('\n'));
 | `pie` | `name` + `value` | 负值会被警告（饼图不表达负值） |
 | `radar` | `x`（指标）+ `y`（数值）+ `series` | 指标名从 x 列推，上限自动取整到好看的刻度 |
 | `heatmap` | `x` + `y`（两个类目列）+ `value` | 二维矩阵表直接画 |
-| `candlestick` | `x` + `y`＝**四列** `[开, 收, 低, 高]` | 少给列会明确报错 |
 | `waterfall` | `name` + `value`（+ `total`） | `total` 列非 0 的行当合计项 |
 | `funnel` / `gauge` / `liquid` | `name` + `value` | 仪表盘/水位球只取第一行（多行会警告） |
 | `sankey` | `source` + `target` + `value` | 一张「起点 / 终点 / 流量」的连线表 |

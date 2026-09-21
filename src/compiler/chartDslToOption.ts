@@ -60,7 +60,7 @@ export function compileChartDsl(dsl: ChartDslDocument): ChartOption {
     ];
   } else {
     const dataset = resolveDataset(dsl) as ResolvedDataset;
-    // 每种类型的数据形状差别很大（category-hue / 三维 / OHLC / 分层…），
+    // 每种类型的数据形状差别很大（category-hue / 三维 / 分层…），
     // 所以按 kind 分派到专门的编译器，而不是硬塞进一个通用路径。
     Object.assign(option, compileByKind(dsl, dataset, kind));
   }
@@ -93,8 +93,6 @@ function compileByKind(dsl: ChartDslDocument, dataset: ResolvedDataset, kind: Ch
       return compileRadar(dsl, dataset);
     case 'heatmap':
       return compileHeatmap(dsl, dataset);
-    case 'candlestick':
-      return compileCandlestick(dsl, dataset);
     case 'waterfall':
       return compileWaterfall(dsl, dataset);
     case 'sankey':
@@ -259,33 +257,6 @@ function compileHeatmap(dsl: ChartDslDocument, dataset: ResolvedDataset): Record
     yAxis: { type: 'category', name: encoding.y },
     grid: { x: false, y: false },
     series: [{ id: 'heatmap', type: 'heatmap', name: encoding.value, data }],
-  };
-}
-
-/** K 线：x 是类目/时间列，y 必须是四列 [开, 收, 低, 高]。 */
-function compileCandlestick(dsl: ChartDslDocument, dataset: ResolvedDataset): Record<string, any> {
-  const encoding = dsl.encoding || {};
-  const xIndex = columnIndex(dataset, encoding.x);
-  const [open, close, low, high] = toArray(encoding.y).map((name) => columnIndex(dataset, name));
-  const categories: string[] = [];
-  const data: number[][] = [];
-  for (const row of dataset.rows) {
-    const category = toLabel(row[xIndex]);
-    const o = toNumber(row[open]);
-    const c = toNumber(row[close]);
-    const l = toNumber(row[low]);
-    const h = toNumber(row[high]);
-    if (!category || o === null || c === null || l === null || h === null) continue;
-    if (!categories.includes(category)) categories.push(category);
-    data.push([o, c, l, h]);
-  }
-  return {
-    legend: { show: false },
-    tooltip: { trigger: 'item' },
-    crosshair: { show: true, axis: 'x', showAxisLabel: true },
-    xAxis: { type: 'category', name: encoding.x, data: categories },
-    yAxis: { name: 'OHLC' },
-    series: [{ id: 'candlestick', type: 'candlestick', name: encoding.x, data }],
   };
 }
 

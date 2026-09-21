@@ -4,6 +4,26 @@
 
 > 下一个版本发布前，改动在这里累积。
 
+## 0.6.0 - 2026-09-21
+
+### 变更（破坏性：移除 `candlestick` kind）
+
+上游 `ice-chart` 已不再承载金融交易类图表（交易能力迁往同族新包 `ice-trading-chart`），
+本包与之对齐，把 K 线从 DSL 里整体摘掉：
+
+- **`kind: 'candlestick'` 不再合法**：从 `CHART_DSL_KINDS` / `CHART_DSL_COMPILED_KINDS` /
+  JSON Schema 的 enum 三处清单移除，校验时按「不支持的 kind」明确报错（并列出可用类型）。
+- 删除四列 OHLC 的语义校验与它专有的 `ohlc-needs-four-columns` 诊断
+  （这个诊断只在 candlestick 下出现，摘掉它不会影响其它 kind 的诊断质量）。
+- 删除 `compileCandlestick` 编译分支。
+- 示例页 `examples/chart-dsl.html` 去掉 K 线预设；README / agent-prompt / SKILL 文档同步。
+- **peer 下限抬到 `@damoqiongqiu/ice-chart@^0.28.0`**：那一版删了内置 `candlestick` 系列，
+  装旧版会得到 npm 的 peer 冲突提示 —— 有意的。
+
+### 其它
+
+- 需要 K 线 DSL 的场景请等待配套的 `ice-trading-dsl`（本包不承接交易语义）。
+
 ## 0.5.0 - 2026-09-19
 
 ### 变更

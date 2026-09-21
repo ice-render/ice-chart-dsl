@@ -31,7 +31,7 @@ skills/ice-chart-dsl/SKILL.md
 
 ## Supported kinds
 
-- compiled from data + encoding: `line`, `area`, `bar`, `scatter`, `candlestick`, `waterfall`,
+- compiled from data + encoding: `line`, `area`, `bar`, `scatter`, `waterfall`,
   `heatmap`, `sankey`, `pie`, `radar`, `funnel`, `gauge`, `liquid`, `function`
 - passthrough (bring your own `series`): `treemap`, `graph`, `parametric`, `boxplot`,
   and any custom series type registered in ice-chart
