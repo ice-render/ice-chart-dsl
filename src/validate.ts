@@ -223,18 +223,6 @@ export function validateChartDsl(dsl: ChartDslDocument | any): ChartDslValidatio
     return finish(errors, warnings);
   }
 
-  // K 线：四列 OHLC，顺序固定为 [开, 收, 低, 高]
-  if (kind === 'candlestick') {
-    needColumn(encoding.x, 'encoding.x', true);
-    const columns = toArray(encoding.y);
-    if (columns.length !== 4) {
-      fail('ohlc-needs-four-columns', `K 线的 encoding.y 必须是四列，按 [开, 收, 低, 高] 顺序给出（当前 ${columns.length} 列）。`, 'encoding.y');
-    } else {
-      for (const name of columns) needNumeric(name, 'encoding.y', true);
-    }
-    return finish(errors, warnings);
-  }
-
   // 瀑布图：项目 + 增减值，可选的合计标记列
   if (kind === 'waterfall') {
     needColumn(encoding.name, 'encoding.name', true);

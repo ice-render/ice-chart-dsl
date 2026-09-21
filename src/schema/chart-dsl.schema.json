@@ -15,7 +15,6 @@
         "scatter",
         "function",
         "radar",
-        "candlestick",
         "heatmap",
         "sankey",
         "treemap",

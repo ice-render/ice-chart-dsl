@@ -20,7 +20,6 @@ export const CHART_DSL_KINDS = [
   'scatter',
   'function',
   'radar',
-  'candlestick',
   'heatmap',
   'sankey',
   'treemap',
@@ -42,7 +41,6 @@ export const CHART_DSL_COMPILED_KINDS: ChartDslKind[] = [
   'area',
   'bar',
   'scatter',
-  'candlestick',
   'waterfall',
   'heatmap',
   // 关系 / 分层

@@ -26,7 +26,7 @@ This SKILL is the right choice for:
 
 - business charts: line / area / bar / pie / scatter bubble
 - tables with a second category dimension: radar (indicators), heatmap (row × column matrix)
-- financial tables: candlestick (open/close/low/high), waterfall (with a total row)
+- staged totals: waterfall (with a total row)
 - flow tables: sankey (source / target / value)
 - single-value cards: funnel / gauge / liquid
 - math curves: `kind: "function"` (e.g. `sin(x)/x`, damped oscillation)
@@ -69,7 +69,6 @@ npm install @damoqiongqiu/ice-chart-dsl @damoqiongqiu/ice-chart ice-render
   `waterfall` uses them plus an optional `encoding.total` column (non-zero marks the total row).
 - `encoding.x` + `encoding.y` + `encoding.series` make a `radar` (x holds the indicator names).
 - `encoding.x` + `encoding.y` (two category columns) + `encoding.value` make a `heatmap`.
-- `encoding.x` + `encoding.y` **as four columns `[open, close, low, high]`** make a `candlestick`.
 - `encoding.source` + `encoding.target` + `encoding.value` make a `sankey`.
 - `kind: "function"` needs `expression` (+ optional `domain`, `params`) and no data.
 
