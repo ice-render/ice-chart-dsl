@@ -134,6 +134,6 @@ Example feedback:
 ## Reference
 
 - package: `@damoqiongqiu/ice-chart-dsl` (npm)
-- runtime peer dependencies: `@damoqiongqiu/ice-chart@^0.20.0` （标注需要 0.20.0 起）+
-  `ice-render@^2.3.0`（家族当前引擎 `2.3.0`，建议直接装最新）
+- runtime peer dependencies: `@damoqiongqiu/ice-chart@^0.30.1`（标注需要 0.30.1 起）+
+  `ice-render@^4.2.0`（家族当前引擎 `4.3.0`，建议直接装最新）
 - schema: `src/schema/chart-dsl.schema.json`
