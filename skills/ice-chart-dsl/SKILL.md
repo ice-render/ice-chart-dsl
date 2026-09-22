@@ -1,7 +1,7 @@
 ---
 name: ice-chart-dsl
 description: Build interactive ice-chart charts from a JSON-first DSL — a table plus an encoding that binds columns to channels, with structured diagnostics for self-repair.
-version: "0.2.0"
+version: "0.2.1"
 category: ux
 platforms:
   - claude-code
