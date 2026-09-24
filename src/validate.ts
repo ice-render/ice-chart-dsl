@@ -27,7 +27,7 @@ const ROOT_FIELDS = [
 const ENCODING_FIELDS = ['x', 'y', 'series', 'size', 'color', 'name', 'value', 'total', 'source', 'target'];
 
 /** 有 x / y 坐标系的 kind —— 标注只对这些有意义。 */
-const CARTESIAN_KINDS: ChartDslKind[] = ['line', 'area', 'bar', 'scatter', 'violin', 'beeswarm'];
+const CARTESIAN_KINDS: ChartDslKind[] = ['line', 'area', 'bar', 'scatter', 'violin', 'beeswarm', 'hexbin'];
 
 /** 标注里「有没有给值」的判断：`0` 与 `''` 是两种不同情况，前者是合法值。 */
 function hasAnnotationValue(value: any): boolean {
@@ -188,7 +188,7 @@ export function validateChartDsl(dsl: ChartDslDocument | any): ChartDslValidatio
     dsl.matrix,
     {
       kind,
-      cartesian: kind === 'line' || kind === 'area' || kind === 'bar' || kind === 'scatter' || kind === 'violin' || kind === 'beeswarm',
+      cartesian: CARTESIAN_KINDS.includes(kind),
       seriesCount: encoding.series && columnIndex(dataset, encoding.series) >= 0
         ? unique(dataset.rows.map((row) => toLabel(row[columnIndex(dataset, encoding.series)])).filter((v) => v !== '')).length
         : Math.max(1, toArray(encoding.y).length),
@@ -288,8 +288,10 @@ export function validateChartDsl(dsl: ChartDslDocument | any): ChartDslValidatio
     return finish(errors, warnings);
   }
 
-  if (kind === 'line' || kind === 'area' || kind === 'bar' || kind === 'scatter') {
+  if (kind === 'line' || kind === 'area' || kind === 'bar' || kind === 'scatter' || kind === 'hexbin') {
     if (kind === 'scatter' && encoding.size) needNumeric(encoding.size, 'encoding.size', false);
+    // 蜂窝分箱是密度图：x / y 都得是数值，类目 x 没有「格子」的语义
+    if (kind === 'hexbin') needNumeric(encoding.x, 'encoding.x', true);
     const yNames = toArray(encoding.y);
     if (!yNames.length) {
       fail('missing-encoding-channel', `encoding.y 是必填的（一个列名或一组列名）。可用列：${dataset.columns.join(' / ')}。`, 'encoding.y');

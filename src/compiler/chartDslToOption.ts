@@ -101,7 +101,13 @@ export function compileChartDsl(dsl: ChartDslDocument): ChartOption {
 /** 有「绘图区矩形 / 面板」语义的 kind：只有这些才吃 `matrix`。 */
 function isCartesianKind(kind: ChartDslKind): boolean {
   return (
-    kind === 'line' || kind === 'area' || kind === 'bar' || kind === 'scatter' || kind === 'violin' || kind === 'beeswarm'
+    kind === 'line' ||
+    kind === 'area' ||
+    kind === 'bar' ||
+    kind === 'scatter' ||
+    kind === 'violin' ||
+    kind === 'beeswarm' ||
+    kind === 'hexbin'
   );
 }
 
@@ -144,7 +150,7 @@ function compileCartesian(dsl: ChartDslDocument, dataset: ResolvedDataset, kind:
    * 逐点成对给数据：散点与蜂群都要「每个点带着自己的 x」——
    * 蜂群的横向避让是按**分组**做的，靠类目下标反推分组会把顺序当成语义。
    */
-  const pairs = kind === 'scatter' || kind === 'beeswarm';
+  const pairs = kind === 'scatter' || kind === 'beeswarm' || kind === 'hexbin';
 
   const xValues: Array<string | number> = [];
   const pushX = (value: string | number) => {
@@ -196,7 +202,8 @@ function compileCartesian(dsl: ChartDslDocument, dataset: ResolvedDataset, kind:
     tooltip: { trigger: pairs ? 'item' : 'axis' },
     series,
   };
-  if (kind === 'scatter') {
+  // 数值 x + 数值 y 的图（散点 / 蜂窝分箱）给 xy 十字准星，其余只给 x
+  if (kind === 'scatter' || kind === 'hexbin') {
     option.crosshair = { show: true, axis: 'xy', showAxisLabel: true };
   } else {
     option.crosshair = { show: true, axis: 'x', showAxisLabel: true };

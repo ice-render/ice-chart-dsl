@@ -27,6 +27,7 @@ export const CHART_DSL_KINDS = [
   'boxplot',
   'violin',
   'beeswarm',
+  'hexbin',
   'waterfall',
   'funnel',
   'graph',
@@ -48,6 +49,7 @@ export const CHART_DSL_COMPILED_KINDS: ChartDslKind[] = [
   // 分布组图（一张「组 + 观测值」的表 → 密度轮廓 / 逐点避让）
   'violin',
   'beeswarm',
+  'hexbin',
   // 关系 / 分层
   'sankey',
   // 极坐标与单体
