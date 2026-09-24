@@ -190,4 +190,68 @@ describe('validateChartDsl', () => {
   it('导出的 schemaVersion 是 1', () => {
     expect(CHART_DSL_SCHEMA_VERSION).toBe(1);
   });
+
+  describe('分布组图与面板矩阵', () => {
+    const DIST = {
+      schemaVersion: 1,
+      kind: 'violin',
+      data: {
+        columns: ['渠道', '响应'],
+        rows: [
+          ['甲', 120],
+          ['甲', 140],
+          ['乙', 200],
+        ],
+      },
+      encoding: { x: '渠道', y: '响应' },
+    };
+
+    it('violin / beeswarm 是已知 kind，缺 y 时报可执行的错误', () => {
+      expect(validateChartDsl(DIST).valid).toBe(true);
+      expect(validateChartDsl({ ...DIST, kind: 'beeswarm' }).valid).toBe(true);
+
+      const missingY = validateChartDsl({ ...DIST, encoding: { x: '渠道' } });
+      expect(missingY.valid).toBe(false);
+      expect(missingY.errors[0].code).toBe('missing-encoding-channel');
+      // 诊断必须可执行：把可用列名带上
+      expect(missingY.errors[0].message).toContain('渠道');
+      expect(missingY.errors[0].message).toContain('响应');
+    });
+
+    it('violin 的 y 只认一列（多列时给警告而不是静默丢掉）', () => {
+      const result = validateChartDsl({ ...DIST, encoding: { x: '渠道', y: ['响应', '渠道'] } });
+      expect(result.valid).toBe(true);
+      expect(result.warnings.map((w) => w.code)).toContain('violin-single-y');
+    });
+
+    it('matrix：缺 rows / columns 是错误，路径指到字段上', () => {
+      const result = validateChartDsl({ ...LINE, matrix: { columns: 2 } } as any);
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].code).toBe('invalid-matrix');
+      expect(result.errors[0].path).toBe('matrix.rows');
+    });
+
+    it('matrix：只有一块面板 / 用在非直角场景，都只是警告', () => {
+      const single = validateChartDsl({ ...LINE, matrix: { rows: 1, columns: 1 } } as any);
+      expect(single.valid).toBe(true);
+      // 1×1 装 2 个分组：报的是「面板不够」，比笼统说一句「无效」有用
+      expect(single.warnings.map((w) => w.code)).toContain('matrix-too-few-panels');
+
+      // 只有一个系列时，矩阵没有任何可分的东西
+      const noFacet = validateChartDsl({
+        ...LINE,
+        encoding: { x: '月份', y: '销量' },
+        matrix: { rows: 2, columns: 2 },
+      } as any);
+      expect(noFacet.warnings.map((w) => w.code)).toContain('matrix-single-panel');
+
+      const pie = validateChartDsl({
+        ...LINE,
+        kind: 'pie',
+        encoding: { name: '月份', value: '销量' },
+        matrix: { rows: 2, columns: 2 },
+      } as any);
+      expect(pie.warnings.map((w) => w.code)).toContain('matrix-ignored');
+    });
+  });
 });

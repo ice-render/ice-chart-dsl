@@ -65,6 +65,22 @@ export function compileChartDsl(dsl: ChartDslDocument): ChartOption {
     Object.assign(option, compileByKind(dsl, dataset, kind));
   }
 
+  /**
+   * 面板矩阵（数据驱动分面）：按 `encoding.series` 拆出来的系列依次落进各块面板。
+   *
+   * 面板下标由这里分配 —— 「一张表按渠道拆成六块」是意图，用户/agent 不该自己数下标。
+   * 只有直角坐标的 kind 才有面板语义（其余场景 core 也不吃 `matrix`）。
+   */
+  if (dsl.matrix && isCartesianKind(kind)) {
+    option.matrix = dsl.matrix;
+    const seriesList = Array.isArray(option.series) ? option.series : [];
+    if (seriesList.length > 1) {
+      seriesList.forEach((item: any, index: number) => {
+        if (item && typeof item === 'object') item.panel = index;
+      });
+    }
+  }
+
   // 标注图层：原样交给 ice-chart（它的 normalizeAnnotation 负责收拢形状、解析层负责定位）。
   // 放在逃生舱之前，所以 `options.annotation` 依然能整体覆盖它。
   if (dsl.annotation && typeof dsl.annotation === 'object') {
@@ -82,6 +98,13 @@ export function compileChartDsl(dsl: ChartDslDocument): ChartOption {
   return option as ChartOption;
 }
 
+/** 有「绘图区矩形 / 面板」语义的 kind：只有这些才吃 `matrix`。 */
+function isCartesianKind(kind: ChartDslKind): boolean {
+  return (
+    kind === 'line' || kind === 'area' || kind === 'bar' || kind === 'scatter' || kind === 'violin' || kind === 'beeswarm'
+  );
+}
+
 function compileByKind(dsl: ChartDslDocument, dataset: ResolvedDataset, kind: ChartDslKind): Record<string, any> {
   switch (kind) {
     case 'pie':
@@ -95,6 +118,8 @@ function compileByKind(dsl: ChartDslDocument, dataset: ResolvedDataset, kind: Ch
       return compileHeatmap(dsl, dataset);
     case 'waterfall':
       return compileWaterfall(dsl, dataset);
+    case 'violin':
+      return compileViolin(dsl, dataset);
     case 'sankey':
       return compileSankey(dsl, dataset);
     default:
@@ -115,6 +140,11 @@ function compileCartesian(dsl: ChartDslDocument, dataset: ResolvedDataset, kind:
   const numericX = xIndex >= 0 && numericRatio(dataset, xIndex) > 0.9;
   const sizeIndex = encoding.size ? columnIndex(dataset, encoding.size) : -1;
   const seriesIndex = encoding.series ? columnIndex(dataset, encoding.series) : -1;
+  /**
+   * 逐点成对给数据：散点与蜂群都要「每个点带着自己的 x」——
+   * 蜂群的横向避让是按**分组**做的，靠类目下标反推分组会把顺序当成语义。
+   */
+  const pairs = kind === 'scatter' || kind === 'beeswarm';
 
   const xValues: Array<string | number> = [];
   const pushX = (value: string | number) => {
@@ -153,7 +183,7 @@ function compileCartesian(dsl: ChartDslDocument, dataset: ResolvedDataset, kind:
             const size = toNumber(row[sizeIndex]);
             return [xValue, yValue, size === null ? 8 : size];
           }
-          return numericX ? [xValue, yValue] : yValue;
+          return numericX || pairs ? [xValue, yValue] : yValue;
         })
         .filter((item) => item !== null);
       return { id: `series-${index + 1}`, type: kind, name, data };
@@ -162,7 +192,8 @@ function compileCartesian(dsl: ChartDslDocument, dataset: ResolvedDataset, kind:
 
   const option: Record<string, any> = {
     legend: { show: series.length > 1 },
-    tooltip: { trigger: kind === 'scatter' ? 'item' : 'axis' },
+    // 逐点的类型（散点 / 蜂群）按数据项触发；其余按轴触发（一整列）
+    tooltip: { trigger: pairs ? 'item' : 'axis' },
     series,
   };
   if (kind === 'scatter') {
@@ -175,6 +206,68 @@ function compileCartesian(dsl: ChartDslDocument, dataset: ResolvedDataset, kind:
     : { type: 'category', name: encoding.x, data: xValues as string[] };
   option.yAxis = { name: yNames.length === 1 ? yNames[0] : undefined };
   return option;
+}
+
+/**
+ * 小提琴图：x 是「组」，y 是观测值 —— 一张明细表直接变成每组的观测数组。
+ *
+ * 这是 DSL 该干的活：`violin` 在 core 里吃的是 `number[][]`（每组一串观测），
+ * 而用户手上通常是「一行一个观测」的明细表；逐组收集这件事放在这里，
+ * 用户和 agent 都不必自己捏数组。`encoding.series` 给了就拆成多个系列（每个系列一组分布）。
+ */
+function compileViolin(dsl: ChartDslDocument, dataset: ResolvedDataset): Record<string, any> {
+  const encoding = dsl.encoding || {};
+  const xIndex = columnIndex(dataset, encoding.x);
+  const yIndex = columnIndex(dataset, firstColumn(encoding.y));
+  const seriesIndex = encoding.series ? columnIndex(dataset, encoding.series) : -1;
+
+  const xValues: string[] = [];
+  // 组名按**首次出现**排序，先收齐：每个系列的数据都要与这份顺序对齐
+  for (const row of dataset.rows) {
+    const key = xIndex >= 0 ? toLabel(row[xIndex]) : '全部';
+    if (key && !xValues.includes(key)) xValues.push(key);
+  }
+
+  /** 组名 → 观测数组（没有 x 列时全表算一组）。 */
+  const collect = (rows: any[][]): number[][] => {
+    const buckets = new Map<string, number[]>();
+    for (const row of rows) {
+      const key = xIndex >= 0 ? toLabel(row[xIndex]) : '全部';
+      if (!key) continue;
+      const value = toNumber(row[yIndex]);
+      if (value === null) continue;
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key)!.push(value);
+    }
+    return xValues.map((key) => buckets.get(key) || []);
+  };
+
+  let series: any[];
+  if (seriesIndex >= 0) {
+    const groups = new Map<string, any[][]>();
+    for (const row of dataset.rows) {
+      const name = toLabel(row[seriesIndex]) || '（空）';
+      if (!groups.has(name)) groups.set(name, []);
+      groups.get(name)!.push(row);
+    }
+    series = [...groups.entries()].map(([name, rows], index) => ({
+      id: `series-${index + 1}`,
+      type: 'violin',
+      name,
+      data: collect(rows),
+    }));
+  } else {
+    series = [{ id: 'series-1', type: 'violin', name: firstColumn(encoding.y), data: collect(dataset.rows) }];
+  }
+
+  return {
+    legend: { show: series.length > 1 },
+    tooltip: { trigger: 'item' },
+    crosshair: { show: true, axis: 'x', showAxisLabel: true },
+    xAxis: { type: 'category', name: encoding.x, data: xValues },
+    yAxis: { name: firstColumn(encoding.y) },
+    series,
+  };
 }
 
 /** 饼图 / 玫瑰图 / 漏斗 / 仪表盘 / 水位球：都是 name + value 两列。 */

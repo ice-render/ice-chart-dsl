@@ -7,7 +7,7 @@ import {
   type ChartDslKind,
   type ChartDslValidationResult,
 } from './types';
-import { columnIndex, hasValue, numericRatio, resolveDataset, toArray, type ResolvedDataset } from './internal/dataset';
+import { columnIndex, hasValue, numericRatio, resolveDataset, toArray, toLabel, unique, type ResolvedDataset } from './internal/dataset';
 
 const ROOT_FIELDS = [
   'schemaVersion',
@@ -21,12 +21,13 @@ const ROOT_FIELDS = [
   'params',
   'options',
   'series',
+  'matrix',
 ];
 
 const ENCODING_FIELDS = ['x', 'y', 'series', 'size', 'color', 'name', 'value', 'total', 'source', 'target'];
 
 /** 有 x / y 坐标系的 kind —— 标注只对这些有意义。 */
-const CARTESIAN_KINDS: ChartDslKind[] = ['line', 'area', 'bar', 'scatter'];
+const CARTESIAN_KINDS: ChartDslKind[] = ['line', 'area', 'bar', 'scatter', 'violin', 'beeswarm'];
 
 /** 标注里「有没有给值」的判断：`0` 与 `''` 是两种不同情况，前者是合法值。 */
 function hasAnnotationValue(value: any): boolean {
@@ -175,6 +176,27 @@ export function validateChartDsl(dsl: ChartDslDocument | any): ChartDslValidatio
     return index;
   };
 
+  /**
+   * 面板矩阵的校验（与 kind 无关，放在各分支之前）。
+   *
+   * 三个口径：
+   * - 结构错误（缺 rows / columns、不是数字也不是数组）是**错误**，路径指到具体字段；
+   * - 非直角坐标场景**只是警告**（矩阵在那边没有意义，core 也不吃）；
+   * - 只拆出一块面板同样只是警告 —— 「分面只有一块」不报错，但要让用户知道没生效。
+   */
+  validateMatrix(
+    dsl.matrix,
+    {
+      kind,
+      cartesian: kind === 'line' || kind === 'area' || kind === 'bar' || kind === 'scatter' || kind === 'violin' || kind === 'beeswarm',
+      seriesCount: encoding.series && columnIndex(dataset, encoding.series) >= 0
+        ? unique(dataset.rows.map((row) => toLabel(row[columnIndex(dataset, encoding.series)])).filter((v) => v !== '')).length
+        : Math.max(1, toArray(encoding.y).length),
+    },
+    fail,
+    warn
+  );
+
   // name + value 家族：饼图 / 漏斗 / 仪表盘 / 水位球
   if (kind === 'pie' || kind === 'funnel' || kind === 'gauge' || kind === 'liquid') {
     needColumn(encoding.name, 'encoding.name', kind === 'pie' || kind === 'funnel');
@@ -246,6 +268,26 @@ export function validateChartDsl(dsl: ChartDslDocument | any): ChartDslValidatio
     return finish(errors, warnings);
   }
 
+  // 分布组图：x 是「组」，y 是每一行一个观测值（violin 只吃一列，beeswarm 逐点）
+  if (kind === 'violin' || kind === 'beeswarm') {
+    const yNames = toArray(encoding.y);
+    if (!yNames.length) {
+      fail('missing-encoding-channel', `encoding.y 是必填的（观测值那一列）。可用列：${dataset.columns.join(' / ')}。`, 'encoding.y');
+    } else {
+      needNumeric(yNames[0], 'encoding.y', true);
+      if (kind === 'violin' && yNames.length > 1) {
+        warn(
+          'violin-single-y',
+          `violin 的 y 只认第一列「${yNames[0]}」：多组对比请用 encoding.series 拆系列，或改用 beeswarm。`,
+          'encoding.y'
+        );
+      }
+    }
+    // x 是分组（类目）：不给时按行序当一组，给了就必须存在
+    needColumn(encoding.x, 'encoding.x', false);
+    return finish(errors, warnings);
+  }
+
   if (kind === 'line' || kind === 'area' || kind === 'bar' || kind === 'scatter') {
     if (kind === 'scatter' && encoding.size) needNumeric(encoding.size, 'encoding.size', false);
     const yNames = toArray(encoding.y);
@@ -264,6 +306,61 @@ export function validateChartDsl(dsl: ChartDslDocument | any): ChartDslValidatio
   // 其余编译型之外的 kind（此处当前不可达，保留兜底）
   warn('passthrough-kind', `kind「${kind}」暂不支持 data/encoding 编译，请用 series 直通。`, 'kind');
   return finish(errors, warnings);
+}
+
+/**
+ * 面板矩阵的结构与语义校验。
+ *
+ * 诊断一律可执行：错在哪、为什么不算数是这里唯一要说清的东西 ——
+ * 「matrix 无效」这种话对 agent 没有价值，所以每条都点名到字段或后果。
+ */
+function validateMatrix(
+  matrix: unknown,
+  context: { kind: ChartDslKind; cartesian: boolean; seriesCount: number },
+  fail: (code: string, text: string, path?: string) => void,
+  warn: (code: string, text: string, path?: string) => void
+): void {
+  if (matrix === undefined || matrix === null) return;
+  if (typeof matrix !== 'object' || Array.isArray(matrix)) {
+    fail('invalid-matrix', 'matrix 需要 { rows, columns, gap? }：rows / columns 是数字（等分）或权重数组。', 'matrix');
+    return;
+  }
+  const spec: any = matrix;
+  const validSize = (value: unknown): boolean =>
+    (typeof value === 'number' && isFinite(value) && value > 0) ||
+    (Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === 'number' && isFinite(item) && item > 0));
+  if (!validSize(spec.rows)) {
+    fail('invalid-matrix', 'matrix.rows 要是正数（等分几行）或正数数组（每行的权重）。', 'matrix.rows');
+  }
+  if (!validSize(spec.columns)) {
+    fail('invalid-matrix', 'matrix.columns 要是正数（等分几列）或正数数组（每列的权重）。', 'matrix.columns');
+  }
+  if (spec.gap !== undefined && (typeof spec.gap !== 'number' || !isFinite(spec.gap) || spec.gap < 0)) {
+    fail('invalid-matrix', 'matrix.gap 要是非负数字（面板间距，设备像素）。', 'matrix.gap');
+  }
+  if (!context.cartesian) {
+    warn(
+      'matrix-ignored',
+      `kind「${context.kind}」不是直角坐标场景，matrix 会被忽略（面板矩阵只在直角坐标下生效）。`,
+      'matrix'
+    );
+    return;
+  }
+  const capacity = (typeof spec.rows === 'number' ? Math.floor(spec.rows) : Array.isArray(spec.rows) ? spec.rows.length : 0) *
+    (typeof spec.columns === 'number' ? Math.floor(spec.columns) : Array.isArray(spec.columns) ? spec.columns.length : 0);
+  if (context.seriesCount <= 1) {
+    warn(
+      'matrix-single-panel',
+      'matrix 只拆出一块面板：分面靠 encoding.series（每个分组一块面板）或多个 y 列，至少要两个。',
+      'matrix'
+    );
+  } else if (capacity && context.seriesCount > capacity) {
+    warn(
+      'matrix-too-few-panels',
+      `${context.seriesCount} 个分组只有 ${capacity} 块面板，多出来的会挤在最后一块上。`,
+      'matrix'
+    );
+  }
 }
 
 function finish(errors: ChartDslDiagnostic[], warnings: ChartDslDiagnostic[]): ChartDslValidationResult {

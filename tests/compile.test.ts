@@ -252,6 +252,142 @@ describe('新增类型的编译细节', () => {
     expect(option.sankey.links).toHaveLength(2);
   });
 
+  /**
+   * 分布组图：一张「组 + 观测值」的表，应该直接编译成 violin / beeswarm 的数据形状
+   * —— 用户不该自己去把同一个组的值捏成一个数组（那是 ChartOption 的活，不是 DSL 的活）。
+   */
+  it('violin：按组把观测值收成 number[][]，并过一遍 core 的归一化', () => {
+    const option: any = compileChartDsl({
+      kind: 'violin',
+      data: {
+        columns: ['渠道', '响应'],
+        rows: [
+          ['甲', 120],
+          ['乙', 200],
+          ['甲', 140],
+          ['乙', 260],
+          ['甲', 160],
+        ],
+      },
+      encoding: { x: '渠道', y: '响应' },
+    });
+    const series = option.series[0];
+    expect(series.type).toBe('violin');
+    // 组按首次出现排序，组内保持原顺序
+    expect(series.data).toEqual([
+      [120, 140, 160],
+      [200, 260],
+    ]);
+    expect(option.xAxis).toMatchObject({ type: 'category', data: ['甲', '乙'] });
+    expect(option.tooltip).toMatchObject({ trigger: 'item' });
+
+    // 集成断言：编译产物必须能被 core 吃下（密度轮廓真的算出来了）
+    const norm: any = normalizeOption(option);
+    expect(norm.xAxis.categoryDomain ?? norm.xAxis.domain).toBeTruthy();
+    const profile = norm.series[0].pointAt(0).violin;
+    expect(profile.values).toEqual([120, 140, 160]);
+    expect(profile.grid.length).toBeGreaterThan(16);
+    expect(norm.series[0].pointAt(0).y).toBe(140);
+  });
+
+  it('beeswarm：逐点编成 [组, 值]，命中仍是逐个观测', () => {
+    const option: any = compileChartDsl({
+      kind: 'beeswarm',
+      data: {
+        columns: ['渠道', '响应'],
+        rows: [
+          ['甲', 120],
+          ['甲', 140],
+          ['乙', 200],
+        ],
+      },
+      encoding: { x: '渠道', y: '响应' },
+    });
+    expect(option.series[0].type).toBe('beeswarm');
+    // 每个点都带着自己的分组（类别轴下也要成对给，避让要靠它分组）
+    expect(option.series[0].data).toEqual([
+      ['甲', 120],
+      ['甲', 140],
+      ['乙', 200],
+    ]);
+    expect(option.tooltip).toMatchObject({ trigger: 'item' });
+
+    const norm: any = normalizeOption(option);
+    expect(norm.series[0].pointCount).toBe(3);
+    expect(norm.series[0].pointAt(0).xValue).toBe('甲');
+  });
+
+  /**
+   * 面板矩阵：DSL 是「一张表 + encoding」的那一层，所以**数据驱动分面**归它 ——
+   * 按 `series` 列拆出来的每个系列各占一块面板，用户不用自己算 panel 下标。
+   */
+  it('matrix：按 series 列分面，每个系列一个 panel', () => {
+    const option: any = compileChartDsl({
+      kind: 'line',
+      matrix: { rows: 1, columns: 3, gap: 10 },
+      data: {
+        columns: ['月份', '销量', '渠道'],
+        rows: [
+          ['1月', 120, '线上'],
+          ['1月', 90, '线下'],
+          ['2月', 132, '线上'],
+          ['2月', 96, '线下'],
+        ],
+      },
+      encoding: { x: '月份', y: '销量', series: '渠道' },
+    });
+    expect(option.matrix).toEqual({ rows: 1, columns: 3, gap: 10 });
+    expect(option.series.map((s: any) => s.name)).toEqual(['线上', '线下']);
+    expect(option.series.map((s: any) => s.panel)).toEqual([0, 1]);
+
+    const norm: any = normalizeOption(option);
+    expect(norm.matrix.panelCount).toBe(3);
+    expect(norm.series.map((s: any) => s.panel)).toEqual([0, 1]);
+  });
+
+  it('matrix 配多列 y：每列一个面板', () => {
+    const option: any = compileChartDsl({
+      kind: 'line',
+      matrix: { rows: 1, columns: 2 },
+      data: {
+        columns: ['月份', '线上', '线下'],
+        rows: [
+          ['1月', 120, 90],
+          ['2月', 132, 96],
+        ],
+      },
+      encoding: { x: '月份', y: ['线上', '线下'] },
+    });
+    expect(option.series.map((s: any) => s.panel)).toEqual([0, 1]);
+    expect(option.matrix).toMatchObject({ rows: 1, columns: 2 });
+  });
+
+  it('violin + series 列：每个系列一组分布，且都与 x 类目对齐', () => {
+    const option: any = compileChartDsl({
+      kind: 'violin',
+      data: {
+        columns: ['渠道', '响应', '版本'],
+        rows: [
+          ['甲', 120, 'v1'],
+          ['乙', 200, 'v1'],
+          ['甲', 140, 'v2'],
+          ['乙', 260, 'v2'],
+          ['甲', 160, 'v2'],
+        ],
+      },
+      encoding: { x: '渠道', y: '响应', series: '版本' },
+    });
+    expect(option.series.map((s: any) => s.name)).toEqual(['v1', 'v2']);
+    // 两个系列都以同一份 x 类目表为准：没有观测的那组给空数组（不是缺位错位）
+    expect(option.xAxis.data).toEqual(['甲', '乙']);
+    expect(option.series[0].data).toEqual([[120], [200]]);
+    expect(option.series[1].data).toEqual([[140, 160], [260]]);
+
+    const norm: any = normalizeOption(option);
+    expect(norm.series[1].pointAt(0).violin.values).toEqual([140, 160]);
+    expect(norm.series[0].pointAt(1).violin.values).toEqual([200]);
+  });
+
 });
 
 function compileChartDslSafe(dsl: any): { option?: any; error?: any } {
