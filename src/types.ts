@@ -25,6 +25,8 @@ export const CHART_DSL_KINDS = [
   'treemap',
   'gauge',
   'boxplot',
+  'violin',
+  'beeswarm',
   'waterfall',
   'funnel',
   'graph',
@@ -43,6 +45,9 @@ export const CHART_DSL_COMPILED_KINDS: ChartDslKind[] = [
   'scatter',
   'waterfall',
   'heatmap',
+  // 分布组图（一张「组 + 观测值」的表 → 密度轮廓 / 逐点避让）
+  'violin',
+  'beeswarm',
   // 关系 / 分层
   'sankey',
   // 极坐标与单体
@@ -148,6 +153,14 @@ export interface ChartDslDocument {
   kind: ChartDslKind;
   data?: ChartDslDataset;
   encoding?: ChartDslEncoding;
+  /**
+   * 面板矩阵（小倍数）：把按 `encoding.series` 拆出来的每个系列各放进一块面板。
+   *
+   * 这是**数据驱动分面**在 DSL 这一层的样子 —— 「一张表按渠道拆成六块」是意图，
+   * 不是 ChartOption 的字段搬运；面板下标由编译器分配，用户不用自己算。
+   * 只对直角坐标的 kind 有意义（其余场景会被警告并忽略）。
+   */
+  matrix?: { rows: number | number[]; columns: number | number[]; gap?: number };
   /**
    * 标注图层：目标线 / 阈值线 / 异常点 / 目标区间。
    *

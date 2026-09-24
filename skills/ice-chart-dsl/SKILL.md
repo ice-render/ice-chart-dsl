@@ -50,7 +50,8 @@ npm install @damoqiongqiu/ice-chart-dsl @damoqiongqiu/ice-chart ice-render
 ```json
 {
   "schemaVersion": 1,
-  "kind": "line | area | bar | pie | scatter | function | (passthrough kinds)",
+  "kind": "line | area | bar | pie | scatter | violin | beeswarm | function | (passthrough kinds)",
+  "matrix": { "rows": 2, "columns": 3, "gap": 12 },
   "title": "可选",
   "data": { "columns": ["月份", "销量", "渠道"], "rows": [["1月", 120, "线上"]] },
   "encoding": { "x": "月份", "y": "销量", "series": "渠道" },
@@ -70,6 +71,13 @@ npm install @damoqiongqiu/ice-chart-dsl @damoqiongqiu/ice-chart ice-render
 - `encoding.x` + `encoding.y` + `encoding.series` make a `radar` (x holds the indicator names).
 - `encoding.x` + `encoding.y` (two category columns) + `encoding.value` make a `heatmap`.
 - `encoding.source` + `encoding.target` + `encoding.value` make a `sankey`.
+- `encoding.x` (group) + `encoding.y` (observations) make a `violin` (one density contour per
+  group; extra `series` splits it into several distributions) or a `beeswarm` (one dot per
+  observation, dodged inside its group). Both are plain "detail table" inputs — no hand-built arrays.
+- `matrix` turns `encoding.series` (or several `y` columns) into **small multiples**: one panel per
+  group, shared scales, hover/brush/zoom resolved per panel. Panel indexes are assigned by the
+  compiler; warnings (`matrix-single-panel`, `matrix-too-few-panels`) tell you when faceting has
+  nothing to split or too few panels.
 - `kind: "function"` needs `expression` (+ optional `domain`, `params`) and no data.
 
 ## Annotations (goal lines / thresholds / target bands)
@@ -98,7 +106,7 @@ an SLA threshold, an event marker, a target band. That is one field, not a new c
   category names (or indexes) on a category axis, timestamps or date strings on a time axis.
 - Annotations live on the coordinate system, so they follow zoom / pan, stay out of the legend,
   do not occupy data indexes, and never steal hit-testing from the series.
-- Only cartesian kinds (`line` / `area` / `bar` / `scatter`) can host annotations; using them on
+- Only cartesian kinds (`line` / `area` / `bar` / `scatter` / `violin` / `beeswarm`) can host annotations; using them on
   `pie` / `radar` / `sankey` / … raises `annotation-non-cartesian` (those scenes have no x/y axes).
 - Structural mistakes are **errors** (`missing-annotation-value`: missing `value`, or `from` without
   `to`); suspicious values are **warnings** (`annotation-unknown-category`,

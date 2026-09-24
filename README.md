@@ -78,6 +78,8 @@ if (!result.valid) console.log(result.errors.map((e) => e.message).join('\n'));
 | `line` / `area` | `x` + `y`（+ `series`） | 数值 x 自动用数值轴 + `[x, y]` 数据点 |
 | `bar` | `x` + `y`（+ `series`） | 堆叠用 `options.stack` |
 | `scatter` | `x` + `y`（+ `size`） | 绑 `size` 即气泡图 |
+| `beeswarm` | `x`（分组）+ `y`（观测值） | 逐点编成 `[组, 值]`，同一组内自动避让；提示框按数据项触发 |
+| `violin` | `x`（分组）+ `y`（观测值） | 按组把观测值收成 `number[][]`，core 算密度轮廓；多组对比用 `series` 拆系列 |
 | `pie` | `name` + `value` | 负值会被警告（饼图不表达负值） |
 | `radar` | `x`（指标）+ `y`（数值）+ `series` | 指标名从 x 列推，上限自动取整到好看的刻度 |
 | `heatmap` | `x` + `y`（两个类目列）+ `value` | 二维矩阵表直接画 |
@@ -88,6 +90,23 @@ if (!result.valid) console.log(result.errors.map((e) => e.message).join('\n'));
 
 **直通**：`treemap` / `graph` / `parametric` / `boxplot` 等直接给 `series`（`options` 照常透传）。
 **逃生舱**：`options` 里的键覆盖编译结果（`series` 除外），所以 DSL 跟不上核心演进时不会把人堵死。
+
+**面板矩阵（数据驱动分面）**：顶层加 `matrix: { rows, columns, gap? }`，DSL 会把
+`encoding.series` 拆出来的每个分组依次放进一块面板（多列 `y` 同理，每列一块）——
+「一张表按渠道拆成六块」是**意图**，面板下标由编译器分配，用户不用自己数。
+
+```json
+{
+  "kind": "line",
+  "matrix": { "rows": 2, "columns": 3, "gap": 12 },
+  "data": { "columns": ["月份", "销量", "渠道"], "rows": [["1月", 120, "线上"], ["1月", 90, "线下"]] },
+  "encoding": { "x": "月份", "y": "销量", "series": "渠道" }
+}
+```
+
+只有直角坐标的 kind 才有面板语义（其余场景会被警告并忽略）；只拆出一块面板、或分组数超过
+面板数，都会给可执行的警告（`matrix-single-panel` / `matrix-too-few-panels`）。
+分布组图的细调（`violin.bandwidth` / `beeswarm.spread` 等）走 `series` 直通 —— 那属于 ChartOption 的活。
 
 ## 标注：目标线 / 阈值线 / 异常点 / 目标区间
 
