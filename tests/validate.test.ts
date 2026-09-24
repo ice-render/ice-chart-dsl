@@ -218,6 +218,25 @@ describe('validateChartDsl', () => {
       expect(missingY.errors[0].message).toContain('响应');
     });
 
+    it('hexbin：已知 kind，x / y 都要是数值列', () => {
+      const ok = validateChartDsl({
+        schemaVersion: 1,
+        kind: 'hexbin',
+        data: { columns: ['x', 'y'], rows: [[1, 2], [3, 4]] },
+        encoding: { x: 'x', y: 'y' },
+      });
+      expect(ok.valid).toBe(true);
+
+      const notNumeric = validateChartDsl({
+        schemaVersion: 1,
+        kind: 'hexbin',
+        data: { columns: ['x', 'y'], rows: [['甲', 2], ['乙', 4]] },
+        encoding: { x: 'x', y: 'y' },
+      });
+      expect(notNumeric.valid).toBe(false);
+      expect(notNumeric.errors.map((e) => e.code)).toContain('non-numeric-column');
+    });
+
     it('violin 的 y 只认一列（多列时给警告而不是静默丢掉）', () => {
       const result = validateChartDsl({ ...DIST, encoding: { x: '渠道', y: ['响应', '渠道'] } });
       expect(result.valid).toBe(true);

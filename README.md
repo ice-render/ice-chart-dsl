@@ -79,6 +79,7 @@ if (!result.valid) console.log(result.errors.map((e) => e.message).join('\n'));
 | `bar` | `x` + `y`（+ `series`） | 堆叠用 `options.stack` |
 | `scatter` | `x` + `y`（+ `size`） | 绑 `size` 即气泡图 |
 | `beeswarm` | `x`（分组）+ `y`（观测值） | 逐点编成 `[组, 值]`，同一组内自动避让；提示框按数据项触发 |
+| `hexbin` | `x` + `y`（都要数值，+ 可选 `size` 当权重） | 两列点表直接编成蜂窝分箱；十字准星 xy，提示框按格子 |
 | `violin` | `x`（分组）+ `y`（观测值） | 按组把观测值收成 `number[][]`，core 算密度轮廓；多组对比用 `series` 拆系列 |
 | `pie` | `name` + `value` | 负值会被警告（饼图不表达负值） |
 | `radar` | `x`（指标）+ `y`（数值）+ `series` | 指标名从 x 列推，上限自动取整到好看的刻度 |
@@ -89,6 +90,7 @@ if (!result.valid) console.log(result.errors.map((e) => e.message).join('\n'));
 | `function` | `expression`（+ `domain` / `params`） | 不需要 data |
 
 **直通**：`treemap` / `graph` / `parametric` / `boxplot` 等直接给 `series`（`options` 照常透传）。
+分箱的半径与配色（`hexbin.radius` / `aggregate` / 配色）也走直通或 `options` —— 那属于 ChartOption 的活。
 **逃生舱**：`options` 里的键覆盖编译结果（`series` 除外），所以 DSL 跟不上核心演进时不会把人堵死。
 
 **面板矩阵（数据驱动分面）**：顶层加 `matrix: { rows, columns, gap? }`，DSL 会把

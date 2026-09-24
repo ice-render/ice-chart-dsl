@@ -388,6 +388,55 @@ describe('新增类型的编译细节', () => {
     expect(norm.series[0].pointAt(1).violin.values).toEqual([200]);
   });
 
+  /**
+   * 六边形分箱：数值 x + 数值 y 的「两列点表」直接编成 hexbin。
+   * 第三个数（如果给了）就是权重 —— 与散点的第三维同一个位置，用户不用记两套写法。
+   */
+  it('hexbin：两列点表直接编，第三列自动当权重', () => {
+    const option: any = compileChartDsl({
+      kind: 'hexbin',
+      data: {
+        columns: ['x', 'y'],
+        rows: [
+          [10, 20],
+          [11, 21],
+          [40, 60],
+        ],
+      },
+      encoding: { x: 'x', y: 'y' },
+    });
+    expect(option.series[0].type).toBe('hexbin');
+    expect(option.series[0].data).toEqual([
+      [10, 20],
+      [11, 21],
+      [40, 60],
+    ]);
+    expect(option.tooltip).toMatchObject({ trigger: 'item' });
+    expect(option.crosshair).toMatchObject({ axis: 'xy' });
+
+    const norm: any = normalizeOption(option);
+    expect(norm.series[0].pointCount).toBe(3);
+    expect(norm.series[0].pointAt(2).y).toBe(60);
+  });
+
+  it('hexbin 的可选权重列：绑 size 通道就带进第三个位置', () => {
+    const option: any = compileChartDsl({
+      kind: 'hexbin',
+      data: {
+        columns: ['x', 'y', '权重'],
+        rows: [
+          [10, 20, 5],
+          [11, 21, 7],
+        ],
+      },
+      encoding: { x: 'x', y: 'y', size: '权重' },
+    });
+    expect(option.series[0].data).toEqual([
+      [10, 20, 5],
+      [11, 21, 7],
+    ]);
+  });
+
 });
 
 function compileChartDslSafe(dsl: any): { option?: any; error?: any } {

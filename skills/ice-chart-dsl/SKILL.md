@@ -50,7 +50,7 @@ npm install @damoqiongqiu/ice-chart-dsl @damoqiongqiu/ice-chart ice-render
 ```json
 {
   "schemaVersion": 1,
-  "kind": "line | area | bar | pie | scatter | violin | beeswarm | function | (passthrough kinds)",
+  "kind": "line | area | bar | pie | scatter | violin | beeswarm | hexbin | function | (passthrough kinds)",
   "matrix": { "rows": 2, "columns": 3, "gap": 12 },
   "title": "可选",
   "data": { "columns": ["月份", "销量", "渠道"], "rows": [["1月", 120, "线上"]] },
@@ -78,6 +78,10 @@ npm install @damoqiongqiu/ice-chart-dsl @damoqiongqiu/ice-chart ice-render
   group, shared scales, hover/brush/zoom resolved per panel. Panel indexes are assigned by the
   compiler; warnings (`matrix-single-panel`, `matrix-too-few-panels`) tell you when faceting has
   nothing to split or too few panels.
+- `encoding.x` + `encoding.y` (both numeric, optional `encoding.size` as weight) make a `hexbin`
+  (hexagonal binning): the two-column point table is compiled as-is, the pointer interacts with
+  **cells** (count / sum / mean / max), and xy crosshair is on. Tuning (radius, aggregation, colors)
+  goes through the `series` passthrough.
 - `kind: "function"` needs `expression` (+ optional `domain`, `params`) and no data.
 
 ## Annotations (goal lines / thresholds / target bands)
