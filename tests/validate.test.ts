@@ -273,4 +273,113 @@ describe('validateChartDsl', () => {
       expect(pie.warnings.map((w) => w.code)).toContain('matrix-ignored');
     });
   });
+
+  describe('日历热力与多轴分类流', () => {
+    const CALENDAR = {
+      schemaVersion: 1,
+      kind: 'calendar',
+      data: {
+        columns: ['日期', '提交数'],
+        rows: [
+          ['2026-01-01', 3],
+          ['2026-01-02', 5],
+        ],
+      },
+      encoding: { x: '日期', y: '提交数' },
+    };
+
+    const ALLUVIAL = {
+      schemaVersion: 1,
+      kind: 'alluvial',
+      data: {
+        columns: ['渠道', '地区', '销售额'],
+        rows: [
+          ['直营网店', '华东', 120],
+          ['直营网店', '华北', 90],
+          ['直播带货', '华南', 60],
+        ],
+      },
+      encoding: { axes: ['渠道', '地区'], value: '销售额' },
+    };
+
+    it('calendar：合法输入不产生诊断', () => {
+      const result = validateChartDsl(CALENDAR);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it('calendar：日期读不出来的行只给警告（core 会跳过那些格子）', () => {
+      const result = validateChartDsl({
+        ...CALENDAR,
+        data: {
+          columns: ['日期', '提交数'],
+          rows: [
+            [1735689600000, 3],
+            ['2026-01-02', 5],
+          ],
+        },
+      });
+      expect(result.valid).toBe(true);
+      const warning = result.warnings.find((w) => w.code === 'calendar-unparseable-date');
+      expect(warning?.path).toBe('encoding.x');
+      // 诊断必须可执行：说清有几行、该写成什么
+      expect(warning?.message).toContain('1 行');
+      expect(warning?.message).toContain('YYYY-MM-DD');
+    });
+
+    it('calendar：缺数值列时报可执行的错误（带上可用列名）', () => {
+      const result = validateChartDsl({ ...CALENDAR, encoding: { x: '日期' } });
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].code).toBe('missing-encoding-channel');
+      expect(result.errors[0].path).toBe('encoding.y');
+      expect(result.errors[0].message).toContain('提交数');
+    });
+
+    it('alluvial：合法输入不产生诊断', () => {
+      const result = validateChartDsl(ALLUVIAL);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it('alluvial：轴少于两个是错误（一个轴没有「流」）', () => {
+      const result = validateChartDsl({ ...ALLUVIAL, encoding: { axes: ['渠道'], value: '销售额' } });
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].code).toBe('alluvial-axes-too-few');
+      expect(result.errors[0].message).toContain('2');
+    });
+
+    it('alluvial：axes 写成单个列名（字符串）时报错并给出写法', () => {
+      const result = validateChartDsl({ ...ALLUVIAL, encoding: { axes: '渠道', value: '销售额' } } as any);
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].code).toBe('invalid-axes');
+      expect(result.errors[0].path).toBe('encoding.axes');
+      expect(result.errors[0].message).toContain('["渠道", "地区"]');
+    });
+
+    it('alluvial：轴列不存在时点名是哪一列（带上可用列名）', () => {
+      const result = validateChartDsl({ ...ALLUVIAL, encoding: { axes: ['渠道', '省份'], value: '销售额' } });
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].code).toBe('unknown-column');
+      expect(result.errors[0].path).toBe('encoding.axes[1]');
+      expect(result.errors[0].message).toContain('地区');
+    });
+
+    it('alluvial：单类目轴 / 行里缺轴值都只是警告', () => {
+      const result = validateChartDsl({
+        ...ALLUVIAL,
+        data: {
+          columns: ['渠道', '地区', '销售额'],
+          rows: [
+            ['直营网店', '华东', 120],
+            ['', '华北', 90],
+          ],
+        },
+      });
+      expect(result.valid).toBe(true);
+      expect(result.warnings.map((w) => w.code)).toContain('alluvial-single-category');
+      expect(result.warnings.map((w) => w.code)).toContain('alluvial-missing-axis-value');
+    });
+  });
 });

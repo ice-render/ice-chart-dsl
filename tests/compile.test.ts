@@ -437,6 +437,124 @@ describe('新增类型的编译细节', () => {
     ]);
   });
 
+  /**
+   * 日历热力：一行一天。「日期 + 数值」两列直接编成 `{ date, value }` 明细，
+   * 排布（周 × 星期）由 core 的归一化算出 —— DSL 只负责把表绑到通道上。
+   */
+  it('calendar：日期列 + 数值列编成日历系列，观感配置走顶层 calendar', () => {
+    const option: any = compileChartDsl({
+      kind: 'calendar',
+      data: {
+        columns: ['日期', '提交数'],
+        rows: [
+          ['2026-01-01', 3],
+          ['2026-01-02', 5],
+        ],
+      },
+      encoding: { x: '日期', y: '提交数' },
+      calendar: { weekStart: 0, maxColor: '#a21caf' },
+    } as any);
+    expect(option.series[0].type).toBe('calendar');
+    expect(option.series[0].data).toEqual([
+      { date: '2026-01-01', value: 3 },
+      { date: '2026-01-02', value: 5 },
+    ]);
+    expect(option.calendar).toEqual({ weekStart: 0, maxColor: '#a21caf' });
+    expect(option.tooltip).toMatchObject({ trigger: 'item' });
+
+    // 集成断言：编译产物过一遍 core 的归一化，日期真的落进了格子
+    const norm: any = normalizeOption(option);
+    expect(norm.series[0].calendarGrid.cells).toHaveLength(2);
+    expect(norm.series[0].calendarGrid.cells[0]).toMatchObject({ date: '2026-01-01', value: 3 });
+  });
+
+  /**
+   * 多轴分类流：一张表 + 「哪几列是轴」。
+   *
+   * 轴列名写在 `encoding.axes` 里（至少两个），流量列写 `encoding.value`；
+   * core 要的 `alluvial.rows`（记录对象数组）由编译器从 `data` 转出来，
+   * 用户和 agent 都不必自己把行拍成对象。
+   */
+  it('alluvial：表 + axes / value 编成 core 要的记录表，观感配置走顶层 alluvial', () => {
+    const option: any = compileChartDsl({
+      kind: 'alluvial',
+      data: {
+        columns: ['渠道', '地区', '品类', '销售额'],
+        rows: [
+          ['直营网店', '华东', '手机', 120],
+          ['直营网店', '华北', '配件', 90],
+          ['直播带货', '华南', '手机', 60],
+        ],
+      },
+      encoding: { axes: ['渠道', '地区', '品类'], value: '销售额' },
+      alluvial: { sort: 'total', nodeWidth: 14 },
+    } as any);
+    expect(option.series[0]).toMatchObject({ type: 'alluvial' });
+    expect(option.alluvial).toEqual({
+      axes: ['渠道', '地区', '品类'],
+      valueField: '销售额',
+      sort: 'total',
+      nodeWidth: 14,
+      rows: [
+        { 渠道: '直营网店', 地区: '华东', 品类: '手机', 销售额: 120 },
+        { 渠道: '直营网店', 地区: '华北', 品类: '配件', 销售额: 90 },
+        { 渠道: '直播带货', 地区: '华南', 品类: '手机', 销售额: 60 },
+      ],
+    });
+    expect(option.tooltip).toMatchObject({ trigger: 'item' });
+
+    // 集成断言：编译产物过一遍 core 的归一化 —— 节点 + 带子都被认出来了
+    // 3 个轴（2 / 3 / 2 个类目）= 7 个节点，相邻两段流量 3 + 3 = 6 条
+    const norm: any = normalizeOption(option);
+    expect(norm.series[0].alluvialOption.axes).toEqual(['渠道', '地区', '品类']);
+    expect(norm.series[0].pointCount).toBe(13);
+  });
+
+  it('逃生舱 options.calendar / options.alluvial 能整体覆盖顶层字段', () => {
+    const calendar: any = compileChartDsl({
+      kind: 'calendar',
+      data: { columns: ['日期', '提交数'], rows: [['2026-01-01', 3]] },
+      encoding: { x: '日期', y: '提交数' },
+      calendar: { weekStart: 1 },
+      options: { calendar: { weekStart: 0, maxColor: '#a21caf' } },
+    } as any);
+    expect(calendar.calendar).toEqual({ weekStart: 0, maxColor: '#a21caf' });
+
+    const alluvial: any = compileChartDsl({
+      kind: 'alluvial',
+      data: { columns: ['渠道', '地区'], rows: [['直营网店', '华东']] },
+      encoding: { axes: ['渠道', '地区'] },
+      alluvial: { nodeWidth: 14 },
+      options: { alluvial: { axes: ['渠道', '地区'], rows: [], nodeWidth: 20 } },
+    } as any);
+    expect(alluvial.alluvial).toEqual({ axes: ['渠道', '地区'], rows: [], nodeWidth: 20 });
+  });
+
+  it('alluvial 不绑 value 时按每条记录算 1（跟 core 的缺省口径一致）', () => {
+    const option: any = compileChartDsl({
+      kind: 'alluvial',
+      data: {
+        columns: ['渠道', '地区'],
+        rows: [
+          ['直营网店', '华东'],
+          ['直营网店', '华东'],
+          ['直播带货', '华南'],
+        ],
+      },
+      encoding: { axes: ['渠道', '地区'] },
+    } as any);
+    // 没绑流量列就不写 valueField：core 自己按「缺省列 = 每条记录 1」算
+    expect(option.alluvial.valueField).toBeUndefined();
+
+    const norm: any = normalizeOption(option);
+    // 渠道 2 + 地区 2 = 4 个节点；两条带子（直营 → 华东 权重 2、直播 → 华南 权重 1）
+    expect(norm.series[0].pointCount).toBe(6);
+    const points = Array.from({ length: 6 }, (_, i) => norm.series[0].pointAt(i));
+    // 同一个 (起点, 终点) 出现两行 → 带子权重是 2，不是两条各 1 的带子
+    expect(points.find((point: any) => point.xValue === '直营网店 → 华东').y).toBe(2);
+    expect(points.find((point: any) => point.xValue === '直播带货 → 华南').y).toBe(1);
+  });
+
 });
 
 function compileChartDslSafe(dsl: any): { option?: any; error?: any } {

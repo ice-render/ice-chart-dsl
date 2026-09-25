@@ -24,7 +24,12 @@
         "funnel",
         "graph",
         "parametric",
-        "liquid"
+        "liquid",
+        "violin",
+        "beeswarm",
+        "hexbin",
+        "calendar",
+        "alluvial"
       ]
     },
     "data": {
@@ -62,7 +67,45 @@
         "value": { "type": "string", "description": "数值列（饼图/漏斗/仪表盘/热力图/桑基等）" },
         "total": { "type": "string", "description": "瀑布图：非 0 的行当合计项" },
         "source": { "type": "string", "description": "桑基图：连线起点列" },
-        "target": { "type": "string", "description": "桑基图：连线终点列" }
+        "target": { "type": "string", "description": "桑基图：连线终点列" },
+        "axes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 2,
+          "description": "多轴分类流：按顺序列出每个轴的列名（至少两个）"
+        }
+      }
+    },
+    "matrix": {
+      "type": "object",
+      "required": ["rows", "columns"],
+      "description": "面板矩阵（数据驱动分面）：把 encoding.series 拆出来的每个分组放进一块面板",
+      "properties": {
+        "rows": { "oneOf": [{ "type": "number" }, { "type": "array", "items": { "type": "number" } }] },
+        "columns": { "oneOf": [{ "type": "number" }, { "type": "array", "items": { "type": "number" } }] },
+        "gap": { "type": "number", "description": "面板间距（设备像素）" }
+      }
+    },
+    "calendar": {
+      "type": "object",
+      "description": "日历热力的排布与配色（列名走 encoding.x / encoding.y）",
+      "properties": {
+        "weekStart": { "enum": [0, 1], "description": "0 = 周日，1 = 周一（默认）" },
+        "weekdayLabels": { "type": "boolean", "description": "是否画左侧星期标签，默认 true" },
+        "monthLabels": { "type": "boolean", "description": "是否画顶部月份标签，默认 true" },
+        "minColor": { "type": "string", "description": "稀（低值）一端的颜色" },
+        "maxColor": { "type": "string", "description": "密（高值）一端的颜色" }
+      }
+    },
+    "alluvial": {
+      "type": "object",
+      "description": "多轴分类流的排序与观感（轴列名走 encoding.axes，流量列走 encoding.value）",
+      "properties": {
+        "spread": { "type": "number", "description": "轴心之间的总跨度占绘图区宽度的比例，默认 0.62" },
+        "nodeWidth": { "type": "number", "description": "节点条宽度（像素），默认 12" },
+        "gap": { "type": "number", "description": "节点之间的垂直间隙（像素），默认 6" },
+        "sort": { "enum": ["total", "name"], "description": "节点排序：按流量（默认）或按名字" },
+        "ribbonOpacity": { "type": "number", "description": "连线的不透明度，默认 0.35" }
       }
     },
     "title": {

@@ -28,6 +28,8 @@ This SKILL is the right choice for:
 - tables with a second category dimension: radar (indicators), heatmap (row × column matrix)
 - staged totals: waterfall (with a total row)
 - flow tables: sankey (source / target / value)
+- N-axis categorical flow: alluvial (a table fanned across 2+ axis columns)
+- day-by-day heat grids: calendar (one row per date)
 - single-value cards: funnel / gauge / liquid
 - math curves: `kind: "function"` (e.g. `sin(x)/x`, damped oscillation)
 - charts that must be interactive afterwards (hover, zoom, brush, legend toggle, serialization)
@@ -50,7 +52,7 @@ npm install @damoqiongqiu/ice-chart-dsl @damoqiongqiu/ice-chart ice-render
 ```json
 {
   "schemaVersion": 1,
-  "kind": "line | area | bar | pie | scatter | violin | beeswarm | hexbin | function | (passthrough kinds)",
+  "kind": "line | area | bar | pie | scatter | violin | beeswarm | hexbin | calendar | alluvial | function | (passthrough kinds)",
   "matrix": { "rows": 2, "columns": 3, "gap": 12 },
   "title": "可选",
   "data": { "columns": ["月份", "销量", "渠道"], "rows": [["1月", 120, "线上"]] },
@@ -82,6 +84,16 @@ npm install @damoqiongqiu/ice-chart-dsl @damoqiongqiu/ice-chart ice-render
   (hexagonal binning): the two-column point table is compiled as-is, the pointer interacts with
   **cells** (count / sum / mean / max), and xy crosshair is on. Tuning (radius, aggregation, colors)
   goes through the `series` passthrough.
+- `encoding.x` (date column) + `encoding.y` (numeric column) make a `calendar` (one cell per day).
+  Dates are **not parsed by the DSL** — ice-chart aligns them by UTC Y/M/D and sums same-day rows,
+  so `Date` objects and loose strings like `2026-1-5` still work. Unreadable cells raise the
+  `calendar-unparseable-date` **warning** (with a row count), never a compile error.
+  Layout and colors go to the top-level `calendar` field (`weekStart`, `weekdayLabels`, `minColor`, …).
+- `encoding.axes` (2+ column names, in order) + optional `encoding.value` make an `alluvial`
+  (multi-axis categorical flow — a **table fanned across axes**, unlike sankey's graph topology).
+  ice-chart wants `alluvial.rows` as record objects; that conversion happens in the compiler, so you
+  pass the same table you would for any other kind. Without `encoding.value` every record counts as 1.
+  Ordering / spacing / colors go to the top-level `alluvial` field (`sort`, `spread`, `nodeWidth`, …).
 - `kind: "function"` needs `expression` (+ optional `domain`, `params`) and no data.
 
 ## Annotations (goal lines / thresholds / target bands)
@@ -146,7 +158,8 @@ Example feedback:
 ## Reference
 
 - package: `@damoqiongqiu/ice-chart-dsl` (npm)
-- runtime peer dependencies: `@damoqiongqiu/ice-chart@^0.30.14`（分布组图 `violin` / `beeswarm`
-  与面板矩阵 `matrix` 是 0.30.13 起，六边形分箱 `hexbin` 是 0.30.14 起；只画基础图用 0.30.1 也够）+
+- runtime peer dependencies: `@damoqiongqiu/ice-chart@^0.30.16`（分布组图 `violin` / `beeswarm`
+  与面板矩阵 `matrix` 是 0.30.13 起，六边形分箱 `hexbin` 是 0.30.14 起，
+  日历热力 `calendar` / 多轴分类流 `alluvial` 是 0.30.16 起；只画基础图用 0.30.1 也够）+
   `ice-render@^4.2.0`（家族当前引擎 `4.3.0`，建议直接装最新）
 - schema: `src/schema/chart-dsl.schema.json`
