@@ -22,9 +22,11 @@ const ROOT_FIELDS = [
   'options',
   'series',
   'matrix',
+  'calendar',
+  'alluvial',
 ];
 
-const ENCODING_FIELDS = ['x', 'y', 'series', 'size', 'color', 'name', 'value', 'total', 'source', 'target'];
+const ENCODING_FIELDS = ['x', 'y', 'series', 'size', 'color', 'name', 'value', 'total', 'source', 'target', 'axes'];
 
 /** 有 x / y 坐标系的 kind —— 标注只对这些有意义。 */
 const CARTESIAN_KINDS: ChartDslKind[] = ['line', 'area', 'bar', 'scatter', 'violin', 'beeswarm', 'hexbin'];
@@ -32,6 +34,20 @@ const CARTESIAN_KINDS: ChartDslKind[] = ['line', 'area', 'bar', 'scatter', 'viol
 /** 标注里「有没有给值」的判断：`0` 与 `''` 是两种不同情况，前者是合法值。 */
 function hasAnnotationValue(value: any): boolean {
   return value !== undefined && value !== null && value !== '';
+}
+
+/**
+ * 这个单元格看起来像不像一个日期。
+ *
+ * **故意比 core 宽松**：core 的日历归一化认「`YYYY-M-D` 严格格式（回读校验）→ 再退回
+ * `Date.parse`」，这里只做最后那一步。判据方向因此是单向的 —— 这里说不像的，
+ * core 一定也读不出来（那些格子会被静默跳过）；这里说像的，core 可能仍然拒绝。
+ * 宁可漏报也不误报：这是提示用的警告，不是编译门槛。
+ */
+function isCalendarDate(value: any): boolean {
+  if (value === undefined || value === null || value === '') return false;
+  if (value instanceof Date) return !Number.isNaN(value.getTime());
+  return isFinite(Date.parse(String(value)));
 }
 
 /**
@@ -285,6 +301,68 @@ export function validateChartDsl(dsl: ChartDslDocument | any): ChartDslValidatio
     }
     // x 是分组（类目）：不给时按行序当一组，给了就必须存在
     needColumn(encoding.x, 'encoding.x', false);
+    return finish(errors, warnings);
+  }
+
+  // 日历热力：一列日期 + 一列数值，一行一天
+  if (kind === 'calendar') {
+    const dateIndex = needColumn(encoding.x, 'encoding.x', true);
+    if (dateIndex >= 0) {
+      const unparseable = dataset.rows.filter((row) => !isCalendarDate(row[dateIndex])).length;
+      if (unparseable) {
+        warn(
+          'calendar-unparseable-date',
+          `${unparseable} 行的日期读不出来（建议写成 "YYYY-MM-DD"），这些格子会被跳过。`,
+          'encoding.x'
+        );
+      }
+    }
+    needNumeric(toArray(encoding.y)[0], 'encoding.y', true);
+    return finish(errors, warnings);
+  }
+
+  // 多轴分类流：一张表 + 「哪几列是轴」；流量列可选（不写就按每条记录算 1）
+  if (kind === 'alluvial') {
+    const rawAxes: any = encoding.axes;
+    if (rawAxes === undefined || rawAxes === null) {
+      fail(
+        'missing-encoding-channel',
+        `encoding.axes 是必填的（按顺序列出每个轴的列名，至少两个）。可用列：${dataset.columns.join(' / ')}。`,
+        'encoding.axes'
+      );
+    } else if (!Array.isArray(rawAxes)) {
+      fail(
+        'invalid-axes',
+        `encoding.axes 要是列名数组（按顺序），例如 ["${dataset.columns[0]}", "${dataset.columns[1] || dataset.columns[0]}"]。`,
+        'encoding.axes'
+      );
+    } else if (rawAxes.length < 2) {
+      fail(
+        'alluvial-axes-too-few',
+        `多轴分类流至少要 2 个轴（相邻轴之间才有流量带），encoding.axes 现在只有 ${rawAxes.length} 个。可用列：${dataset.columns.join(' / ')}。`,
+        'encoding.axes'
+      );
+    } else {
+      rawAxes.forEach((name: any, index: number) => {
+        const path = `encoding.axes[${index}]`;
+        const axisIndex = needColumn(name, path, true);
+        if (axisIndex < 0) return;
+        // 一个轴只有单类目 = 一条直线，没有流量可分（多半是列选错了）
+        const categories = new Set(dataset.rows.map((row) => toLabel(row[axisIndex])).filter((value) => value !== ''));
+        if (categories.size < 2) {
+          warn('alluvial-single-category', `轴「${name}」只有 ${categories.size} 个类目，画出来是一条直线、没有流量。`, path);
+        }
+        // core 的跳过口径：这一格是 undefined / null / 空串（0 与 false 都是合法类目）
+        const empty = dataset.rows.filter((row) => {
+          const value = row[axisIndex];
+          return value === undefined || value === null || value === '';
+        }).length;
+        if (empty) {
+          warn('alluvial-missing-axis-value', `${empty} 行在轴「${name}」上是空的，这些行会被跳过。`, path);
+        }
+      });
+    }
+    if (encoding.value) needNumeric(encoding.value, 'encoding.value', false);
     return finish(errors, warnings);
   }
 

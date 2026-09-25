@@ -80,6 +80,8 @@ if (!result.valid) console.log(result.errors.map((e) => e.message).join('\n'));
 | `scatter` | `x` + `y`（+ `size`） | 绑 `size` 即气泡图 |
 | `beeswarm` | `x`（分组）+ `y`（观测值） | 逐点编成 `[组, 值]`，同一组内自动避让；提示框按数据项触发 |
 | `hexbin` | `x` + `y`（都要数值，+ 可选 `size` 当权重） | 两列点表直接编成蜂窝分箱；十字准星 xy，提示框按格子 |
+| `calendar` | `x`（日期列）+ `y`（数值列） | 一行一天的热力格；日期按 **UTC 的 Y/M/D** 对齐（跨时区一致），同一天多条取和 |
+| `alluvial` | `axes`（≥ 2 个轴列）+ 可选 `value` | **表的分面**（对比桑基是图的拓扑）：一行记录在每个轴上取一个类目；不绑 `value` 就按每条记录算 1 |
 | `violin` | `x`（分组）+ `y`（观测值） | 按组把观测值收成 `number[][]`，core 算密度轮廓；多组对比用 `series` 拆系列 |
 | `pie` | `name` + `value` | 负值会被警告（饼图不表达负值） |
 | `radar` | `x`（指标）+ `y`（数值）+ `series` | 指标名从 x 列推，上限自动取整到好看的刻度 |
@@ -109,6 +111,40 @@ if (!result.valid) console.log(result.errors.map((e) => e.message).join('\n'));
 只有直角坐标的 kind 才有面板语义（其余场景会被警告并忽略）；只拆出一块面板、或分组数超过
 面板数，都会给可执行的警告（`matrix-single-panel` / `matrix-too-few-panels`）。
 分布组图的细调（`violin.bandwidth` / `beeswarm.spread` 等）走 `series` 直通 —— 那属于 ChartOption 的活。
+
+## 日历热力与多轴分类流
+
+两块**自带坐标语义**的类型（不画直角坐标轴）：日历的「轴」是日历本身，多轴分类流有 N 个类目轴。
+它们的**列名照旧写在 `encoding` 里**，只有与数据无关的观感配置走各自顶层的同名字段。
+
+```json
+{
+  "kind": "calendar",
+  "data": { "columns": ["日期", "提交数"], "rows": [["2026-01-01", 3], ["2026-01-02", 5]] },
+  "encoding": { "x": "日期", "y": "提交数" },
+  "calendar": { "weekStart": 0, "maxColor": "#a21caf" }
+}
+```
+
+```json
+{
+  "kind": "alluvial",
+  "data": {
+    "columns": ["渠道", "地区", "品类"],
+    "rows": [["直营网店", "华东", "手机"], ["直播带货", "华南", "配件"]]
+  },
+  "encoding": { "axes": ["渠道", "地区", "品类"] },
+  "alluvial": { "sort": "total", "nodeWidth": 14 }
+}
+```
+
+- `calendar`：`encoding.x` 是日期列、`encoding.y` 是数值列（一行一天）。日期**不在 DSL 里解析**
+  （core 按 UTC 的 Y/M/D 对齐、同一天多条取和），所以 `Date` 与 `2026-1-5` 这类写法都还能用；
+  读不出来的格子只会得到 `calendar-unparseable-date` **警告**（带上行数），不会挡住编译。
+- `alluvial`：`encoding.axes` 按顺序列出轴列（至少两个），`encoding.value` 是流量列；
+  不绑 `value` 时按每条记录算 1 —— core 的 `alluvial.rows` 是记录对象数组，这个转换在编译期做，
+  调用方不必自己把表拍成对象。轴少于两个 / `axes` 写成单个列名 / 轴列不存在都是**错误**
+  （诊断里带可用列名）；单类目轴与「行里缺轴值」只是**警告** —— 后者正是 core 会静默跳过的那些行。
 
 ## 标注：目标线 / 阈值线 / 异常点 / 目标区间
 

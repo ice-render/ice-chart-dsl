@@ -28,6 +28,8 @@ export const CHART_DSL_KINDS = [
   'violin',
   'beeswarm',
   'hexbin',
+  'calendar',
+  'alluvial',
   'waterfall',
   'funnel',
   'graph',
@@ -50,6 +52,9 @@ export const CHART_DSL_COMPILED_KINDS: ChartDslKind[] = [
   'violin',
   'beeswarm',
   'hexbin',
+  // 时间 / 表的分面（自带坐标语义，不画直角坐标轴）
+  'calendar',
+  'alluvial',
   // 关系 / 分层
   'sankey',
   // 极坐标与单体
@@ -95,10 +100,55 @@ export interface ChartDslEncoding {
   source?: string;
   /** 桑基图：连线终点列。 */
   target?: string;
+  /**
+   * 多轴分类流：每个轴的**列名**（按顺序），至少两个才有「流」。
+   *
+   * 轴列名和别的通道一样写在 `encoding` 里 —— 一张表 + 「哪几列是轴」就是全部输入，
+   * core 的 `alluvial.rows` 由编译器从 `data` 转出来，用户不用自己拍记录对象。
+   */
+  axes?: string[];
 }
 
 /** 标注的定位轴：`'y'`（默认）画水平线，`'x'` 画垂直线。 */
 export type ChartDslAnnotationAxis = 'x' | 'y';
+
+/**
+ * 日历热力的观感配置。
+ *
+ * 只有「格子怎么排、颜色怎么走」这类**与数据无关**的旋钮 —— 日期列与数值列是通道，
+ * 写在 `encoding.x` / `encoding.y` 里（与其它 kind 同一口径）。
+ */
+export interface ChartDslCalendarOption {
+  /** 一周从哪天开始：0 = 周日，1 = 周一（默认）。 */
+  weekStart?: 0 | 1;
+  /** 是否画左侧的星期标签，默认 true。 */
+  weekdayLabels?: boolean;
+  /** 是否画顶部的月份标签，默认 true。 */
+  monthLabels?: boolean;
+  /** 稀（低值）一端的颜色。 */
+  minColor?: string;
+  /** 密（高值）一端的颜色。 */
+  maxColor?: string;
+}
+
+/**
+ * 多轴分类流的观感配置。
+ *
+ * 轴列名（`encoding.axes`）与流量列（`encoding.value`）是通道，不在这里重复 ——
+ * 这里只有排序、间距、配色这类旋钮。
+ */
+export interface ChartDslAlluvialOption {
+  /** 轴心之间的总跨度占绘图区宽度的比例，默认 0.62。 */
+  spread?: number;
+  /** 节点条宽度（像素），默认 12。 */
+  nodeWidth?: number;
+  /** 节点之间的垂直间隙（像素），默认 6。 */
+  gap?: number;
+  /** 节点排序：按流量降序（默认）或按名字。 */
+  sort?: 'total' | 'name';
+  /** 连线的不透明度，默认 0.35。 */
+  ribbonOpacity?: number;
+}
 
 /**
  * 标注线：目标线 / 阈值线 / 告警线。
@@ -163,6 +213,18 @@ export interface ChartDslDocument {
    * 只对直角坐标的 kind 有意义（其余场景会被警告并忽略）。
    */
   matrix?: { rows: number | number[]; columns: number | number[]; gap?: number };
+  /**
+   * 日历热力（`kind: 'calendar'`）的观感配置。
+   *
+   * 日期列与数值列走 `encoding.x` / `encoding.y`（一行一天），这里只管排布与配色。
+   */
+  calendar?: ChartDslCalendarOption;
+  /**
+   * 多轴分类流（`kind: 'alluvial'`）的观感配置。
+   *
+   * 轴列名写在 `encoding.axes` 里（至少两个），流量列写 `encoding.value`（不写就按每条记录算 1）。
+   */
+  alluvial?: ChartDslAlluvialOption;
   /**
    * 标注图层：目标线 / 阈值线 / 异常点 / 目标区间。
    *

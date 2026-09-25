@@ -128,6 +128,10 @@ function compileByKind(dsl: ChartDslDocument, dataset: ResolvedDataset, kind: Ch
       return compileViolin(dsl, dataset);
     case 'sankey':
       return compileSankey(dsl, dataset);
+    case 'calendar':
+      return compileCalendar(dsl, dataset);
+    case 'alluvial':
+      return compileAlluvial(dsl, dataset);
     default:
       return compileCartesian(dsl, dataset, kind);
   }
@@ -381,6 +385,61 @@ function compileWaterfall(dsl: ChartDslDocument, dataset: ResolvedDataset): Reco
     xAxis: { type: 'category', name: encoding.name },
     yAxis: { name: encoding.value },
     series: [{ id: 'waterfall', type: 'waterfall', name: encoding.value, barWidth: 0.55, data }],
+  };
+}
+
+/**
+ * 多轴分类流：一张表 + 「哪几列是轴」→ core 要的 `alluvial: { axes, rows, valueField }`。
+ *
+ * 这里做的是 DSL 的正职：core 的 `rows` 是**记录对象数组**（按列名取值），
+ * 而用户手上是 `{ columns, rows }` 的两维表或对象数组 —— 转换 + 列名绑定放这一层，
+ * 调用方不必自己把表拍成对象。空行（轴上是空白）不在这里丢：core 会跳过它们，
+ * 校验层已经就这件事给过可执行的警告，编译期再删一遍只会让诊断与结果对不上。
+ */
+function compileAlluvial(dsl: ChartDslDocument, dataset: ResolvedDataset): Record<string, any> {
+  const encoding = dsl.encoding || {};
+  const axes = (Array.isArray(encoding.axes) ? encoding.axes : []).filter((name) => typeof name === 'string' && name);
+  const rows = dataset.rows.map((row) => {
+    const record: Record<string, any> = {};
+    dataset.columns.forEach((column, index) => {
+      record[column] = row[index];
+    });
+    return record;
+  });
+  return {
+    legend: { show: false },
+    tooltip: { trigger: 'item' },
+    alluvial: {
+      axes,
+      rows,
+      // 没绑流量列时不写 `valueField`：core 的默认口径（缺省列按每条记录算 1）原样生效
+      ...(encoding.value ? { valueField: encoding.value } : {}),
+      ...(dsl.alluvial || {}),
+    },
+    series: [{ id: 'alluvial', type: 'alluvial', name: encoding.value }],
+  };
+}
+
+/**
+ * 日历热力：日期列 + 数值列 → `{ date, value }` 明细（一行一天）。
+ *
+ * 日期**不在这一层解析**：core 的归一化是唯一事实来源（按 UTC 的 Y/M/D 对齐格子，
+ * 同一天多条取和），所以单元格原样透传 —— `Date` 对象与 `2026-1-5` 这类宽松写法都还能用。
+ * 这里只做「两列配对 + 丢掉空行」。
+ */
+function compileCalendar(dsl: ChartDslDocument, dataset: ResolvedDataset): Record<string, any> {
+  const encoding = dsl.encoding || {};
+  const dateIndex = columnIndex(dataset, encoding.x);
+  const valueIndex = columnIndex(dataset, firstColumn(encoding.y));
+  const data = dataset.rows
+    .map((row) => ({ date: row[dateIndex], value: toNumber(row[valueIndex]) }))
+    .filter((item) => item.date !== null && item.date !== undefined && item.date !== '' && item.value !== null);
+  return {
+    legend: { show: false },
+    tooltip: { trigger: 'item' },
+    // 观感配置整块透传（core 的 `option.calendar`）；列名一律走 encoding，不在这里重复
+    ...(dsl.calendar ? { calendar: dsl.calendar } : {}),
+    series: [{ id: 'calendar', type: 'calendar', name: firstColumn(encoding.y), data }],
   };
 }
 

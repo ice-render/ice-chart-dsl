@@ -4,6 +4,36 @@
 
 > 下一个版本发布前，改动在这里累积。
 
+> 跟版 ice-chart 0.30.16：把它的两块新类型接进 DSL —— **日历热力**（`calendar`）与
+> **多轴分类流**（`alluvial`）。两条都遵守本仓铁律：只加「数据绑定 + 意图级默认 + 可执行诊断」，
+> 不做 ChartOption 的字段搬运。
+
+### 新增
+
+- **`calendar` 进编译清单**：`encoding.x` 是日期列、`encoding.y` 是数值列（一行一天），
+  直接编成 core 要的 `{ date, value }` 明细。**日期不在 DSL 里解析** —— core 的归一化是唯一
+  事实来源（按 UTC 的 Y/M/D 对齐格子、同一天多条取和），所以 `Date` 对象与 `2026-1-5`
+  这类宽松写法都还能用。排布与配色走顶层 `calendar`（`weekStart` / `weekdayLabels` /
+  `minColor` / `maxColor`…），`options.calendar` 仍可整体覆盖。
+  校验补了一条 `calendar-unparseable-date`：读到不像日期的格子时给**警告**而不是报错
+  （core 会跳过它们，图表不该因此编译不过），诊断里带行数并点名 `YYYY-MM-DD`。
+
+- **`alluvial` 进编译清单**：`encoding.axes` 按顺序列出每个轴的**列名**（至少两个），
+  `encoding.value` 是流量列（不绑就按每条记录算 1，跟 core 的缺省口径一致）。
+  core 的 `alluvial.rows` 是**记录对象数组**，而用户手上是 `{ columns, rows }` 的表 ——
+  这个转换放在编译期，用户和 agent 都不必自己把行拍成对象。
+  排序 / 间距 / 配色走顶层 `alluvial`（`sort` / `spread` / `nodeWidth` / `ribbonOpacity`…）。
+
+  校验是**可执行**的那一档：轴少于 2 个（`alluvial-axes-too-few`）、`axes` 写成单个列名
+  （`invalid-axes`）、轴列不存在（`unknown-column`，带可用列名）都报错；
+  单类目轴（`alluvial-single-category`："画出来是一条直线"）与行里缺轴值
+  （`alluvial-missing-axis-value`）只是警告 —— 后者正是 core 会静默跳过的那批行。
+
+### 依赖
+
+- **跟版 ice-chart 0.30.16**（devDependency 与 peerDependency 同步）：`calendar` / `alluvial`
+  都是 0.30.16 才有的类型。
+
 ## 0.6.4 - 2026-09-25
 
 > 跟版 ice-chart 0.30.14：把**六边形分箱**（`hexbin`）接进 DSL。
