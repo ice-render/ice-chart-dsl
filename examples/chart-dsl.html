@@ -68,9 +68,15 @@
           <button data-preset="heatmap">热力图</button>
           <button data-preset="waterfall">瀑布</button>
           <button data-preset="sankey">桑基</button>
+          <button data-preset="violin">小提琴</button>
+          <button data-preset="beeswarm">蜂群</button>
+          <button data-preset="hexbin">六边形分箱</button>
+          <button data-preset="calendar">日历热力</button>
+          <button data-preset="alluvial">多轴分类流</button>
           <button data-preset="annotation">标注（目标线 / 达标区）</button>
-          <button data-preset="bad-annotation">标注错误示例</button>
-          <button data-preset="bad-column">错误示例</button>
+          <!-- data-expect="error"：这两个预设「必须报错且不落墨」，冒烟脚本按这个属性分辨 -->
+          <button data-preset="bad-annotation" data-expect="error">标注错误示例</button>
+          <button data-preset="bad-column" data-expect="error">错误示例</button>
         </div>
         <textarea id="dsl" spellcheck="false"></textarea>
         <pre id="diagnostics">…</pre>
@@ -214,6 +220,59 @@
           },
           encoding: { source: '来源', target: '去向', value: '流量' },
         },
+        /**
+         * 分布组图：**同一张明细表**换 kind 就是另一种形态 —— 这正是 DSL 的卖点，
+         * 所以小提琴与蜂群共用 `observations()`，只有 kind 不同。
+         */
+        violin: {
+          schemaVersion: 1,
+          kind: 'violin',
+          title: '各版本响应时间分布（小提琴：看密度轮廓）',
+          data: ChartDslPage.observations(),
+          encoding: { x: '版本', y: '响应时间' },
+        },
+        beeswarm: {
+          schemaVersion: 1,
+          kind: 'beeswarm',
+          title: '各版本响应时间分布（蜂群：逐个观测）',
+          data: ChartDslPage.observations(),
+          encoding: { x: '版本', y: '响应时间' },
+        },
+        hexbin: {
+          schemaVersion: 1,
+          kind: 'hexbin',
+          title: '两簇点云的密度（六边形分箱）',
+          data: ChartDslPage.cloud(),
+          encoding: { x: 'x', y: 'y' },
+        },
+        calendar: {
+          schemaVersion: 1,
+          kind: 'calendar',
+          title: '每日提交数（日历热力 · 近 4 个月）',
+          data: ChartDslPage.daily(),
+          encoding: { x: '日期', y: '提交数' },
+          calendar: { weekStart: 1, maxColor: '#0d6efd' },
+        },
+        /**
+         * 多轴分类流：表的分面 —— 列名照样写在 `encoding.axes` 里，
+         * 观感配置（排序、节点宽度）走顶层 `alluvial`。
+         */
+        alluvial: {
+          schemaVersion: 1,
+          kind: 'alluvial',
+          title: '销售结构：渠道 → 地区 → 品类',
+          data: {
+            columns: ['渠道', '地区', '品类', '销售额'],
+            rows: [
+              ['直营网店', '华东', '手机', 120], ['直营网店', '华北', '配件', 90],
+              ['直营网店', '华东', '服务', 40], ['经销渠道', '华南', '手机', 75],
+              ['经销渠道', '华东', '配件', 55], ['直播带货', '华南', '手机', 60],
+              ['直播带货', '华北', '服务', 35], ['直播带货', '华南', '配件', 25],
+            ],
+          },
+          encoding: { axes: ['渠道', '地区', '品类'], value: '销售额' },
+          alluvial: { sort: 'total', nodeWidth: 14 },
+        },
         'bad-column': {
           schemaVersion: 1,
           kind: 'line',
@@ -250,6 +309,71 @@
         },
       };
 
+        /**
+         * 预设里的样例数据：**确定性伪随机**（同一份种子，每次打开形状都一样），
+         * 明细表要塞几十上百行才成形，写死在预设里既长又难读 —— 生成器填这个缺口。
+         * 注意顺序：契约要求 static 方法排在 static 字段之后，所以 `PRESETS` 是**前向引用**它们
+         * （类的静态方法在静态字段求值前就已装好，这个顺序是合法的）。
+         */
+        static noise(seed) {
+          let state = seed;
+          return () => {
+            state = (state * 1103515245 + 12345) % 2147483648;
+            return state / 2147483648;
+          };
+        }
+
+        /** 分布组图用：三个版本 × 14 个观测（小提琴与蜂群共用，只有 kind 不同）。 */
+        static observations() {
+          const random = ChartDslPage.noise(20260925);
+          const groups = [['v1', 142, 46], ['v2', 126, 34], ['v3', 108, 22]];
+          const rows = [];
+          for (const [version, base, spread] of groups) {
+            for (let i = 0; i < 14; i++) {
+              // 三次均匀分布相加 ≈ 钟形：比单个均匀分布更像真实的响应时间
+              const shape = random() + random() + random() - 1.5;
+              rows.push([version, Math.max(40, Math.round(base + shape * spread))]);
+            }
+          }
+          return { columns: ['版本', '响应时间'], rows };
+        }
+
+        /** 蜂窝分箱用：两簇点云（分箱后才是密度形态，原始点表看不出结构）。 */
+        static cloud() {
+          const random = ChartDslPage.noise(20260926);
+          const clusters = [[30, 34, 9], [62, 70, 11]];
+          const rows = [];
+          for (const [cx, cy, spread] of clusters) {
+            for (let i = 0; i < 120; i++) {
+              const shape = random() + random() + random() - 1.5;
+              const shape2 = random() + random() + random() - 1.5;
+              rows.push([Math.round((cx + shape * spread) * 10) / 10, Math.round((cy + shape2 * spread) * 10) / 10]);
+            }
+          }
+          return { columns: ['x', 'y'], rows };
+        }
+
+        /**
+         * 日历热力用：**120 天**一天不落（日期按 UTC 走，跨时区结论一致）。
+         *
+         * 为什么不是一整年：格子是等边的（尺寸受较短边限制，core 的既定口径），
+         * 本页画布是 760×520 且所有预设共用 —— 塞进 53 周，格子会小到只剩一条细带。
+         * 想要整年视图，把画布改宽（示例页里 `#chart` 的 width）或把这里的窗口改回去。
+         */
+        static daily() {
+          const random = ChartDslPage.noise(20260927);
+          const rows = [];
+          const start = Date.UTC(2026, 0, 1);
+          for (let day = 0; day < 120; day++) {
+            const date = new Date(start + day * 86400000).toISOString().slice(0, 10);
+            const weekday = new Date(start + day * 86400000).getUTCDay();
+            // 周末少提交：日历热力要能一眼看出这类周期规律
+            const weight = weekday === 0 || weekday === 6 ? random() * 4 : 3 + random() * 14;
+            rows.push([date, Math.round(weight)]);
+          }
+          return { columns: ['日期', '提交数'], rows };
+        }
+
         constructor() {
           this.$ = (id) => document.getElementById(id);
           /** 当前图表实例（重渲染前要先 destroy） */
@@ -276,6 +400,8 @@
         });
         this.$('diagnostics').innerHTML = lines.length ? lines.join('\n') : '<span class="ok">✓ 校验通过</span>';
         if (!result.valid) {
+          // 故意**不动画布**：编辑 JSON 的过程中校验不过时，上一张图留在屏幕上比刷成空白好读，
+          // 失败信息靠诊断区与状态行给（冒烟脚本也是按这两处断言的）。
           this.$('meta').textContent = '校验不通过：' + result.errors.length + ' 个错误';
           return;
         }
